@@ -14,7 +14,7 @@ class Display:
         self.win.erase()
 
         # Hint (fila 0)
-        self._draw_left_aligned(self.win, 0, "q salir · esc limpiar", width)
+        self._draw_left_aligned(self.win, 0, "q salir · esc limpiar · c hist", width)
 
         # Expresión (fila 1, alineada a la derecha)
         expr = expression if expression else " "

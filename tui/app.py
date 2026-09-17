@@ -3,12 +3,17 @@
 import curses
 
 from calculator import Calculator, CalcSyntaxError, CalcMathError
+from models.history import History
 from tui.display import Display
+from tui.history_panel import HistoryPanel
 from tui.keyboard import Keyboard, PAIR_NUM, PAIR_OP, PAIR_ACTION
 
 # Código de tecla: backspace puede venir como 127 o 8
 KEY_BACKSPACE = (curses.KEY_BACKSPACE, 127, 8, curses.KEY_DC)
 KEY_ENTER = (10, 13, curses.KEY_ENTER)
+
+DISPLAY_H = 4
+KEYBOARD_H = 5
 
 
 def format_result(value: float) -> str:
@@ -24,6 +29,7 @@ class App:
     def __init__(self, stdscr) -> None:
         self.stdscr = stdscr
         self.calc = Calculator()
+        self.history = History()
         self.expression = ""
         self.result_display = ""
         self.error = ""
@@ -48,11 +54,12 @@ class App:
 
     def _make_windows(self) -> None:
         height, width = self.stdscr.getmaxyx()
-        display_h = 4
-        kb_top = max(display_h, height - 5)
-        self.display_win = curses.newwin(display_h, width, 0, 0)
+        kb_top = max(DISPLAY_H, height - KEYBOARD_H)
+        self.display_win = curses.newwin(DISPLAY_H, width, 0, 0)
+        self.history_win = curses.newwin(kb_top - DISPLAY_H, width, DISPLAY_H, 0)
         self.keyboard_win = curses.newwin(height - kb_top, width, kb_top, 0)
         self.display = Display(self.display_win)
+        self.history_panel = HistoryPanel(self.history_win, self.history)
         self.keyboard = Keyboard(self.keyboard_win)
 
     # ----- loop principal -----
@@ -66,6 +73,10 @@ class App:
                 break
             if ch == 27:  # ESC: limpiar
                 self._handle_action("clear", "")
+                continue
+            if ch in (ord("c"), ord("C")):  # c/C: limpiar historial
+                self.history.clear()
+                self.history_panel.reset_scroll()
                 continue
             if ch == curses.KEY_RESIZE:
                 curses.resizeterm(*self.stdscr.getmaxyx())
@@ -82,6 +93,7 @@ class App:
             except (CalcSyntaxError, CalcMathError, ValueError):
                 self.result_display = ""
         self.display.render(self.expression, self.result_display, self.error)
+        self.history_panel.render()
         self.keyboard.render(highlight=self.expression[-1] if self.expression else None)
         self.stdscr.refresh()
 
@@ -96,10 +108,10 @@ class App:
             self.keyboard.move(0, 1)
             return
         if ch == curses.KEY_UP:
-            self.keyboard.move(-1, 0)
+            self.history_panel.scroll(1)
             return
         if ch == curses.KEY_DOWN:
-            self.keyboard.move(1, 0)
+            self.history_panel.scroll(-1)
             return
         if ch in KEY_ENTER:
             self._handle_action("eval", "")
@@ -142,7 +154,10 @@ class App:
                 return
             try:
                 value = self.calc.evaluate(self.expression)
-                self.result_display = format_result(value)
+                formatted = format_result(value)
+                self.history.add(self.expression, formatted)
+                self.history_panel.reset_scroll()
+                self.result_display = formatted
                 self.error = ""
                 self.just_evaluated = True
             except (CalcSyntaxError, CalcMathError, ValueError) as exc:

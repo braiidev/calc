@@ -1,13 +1,14 @@
 # TODO
 
 ## Doing
-- [ ] v0.3 - Visor de historial debajo del display
+- [ ] v0.4 - Variables: builtins pi/e + asignación y uso en expresiones
 
 ## Next
-- [ ] v0.3 - models/history.py: lista de (expr, result) con máximo
-- [ ] v0.3 - tui/history_panel.py: widget de historial
-- [ ] v0.3 - Integrar guardado por evaluación y navegación
+- [ ] v0.4 - Lexer/Parser: tokens IDENT como variables
+- [ ] v0.4 - Evaluator: lookup de variables + asignación desde la TUI
+- [ ] v0.4 - Teclado/modo: sintaxis de asignación (x = 5) y pantalla de variables
 
 ## Done
+- [x] v0.3 - Historial session: guarda evaluaciones, scroll ↑/↓, limpia con `c`
 - [x] v0.2 - Científica: `**` potencia, `%` módulo, `!` factorial, `sqrt()`, botón ANS
 - [x] v0.1 - Básica: parser + layout display/teclado (TUI curses) + fixes de arranque y foco
