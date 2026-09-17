@@ -76,6 +76,7 @@ class Keyboard:
         height, width = self.win.getmaxyx()
         self.win.erase()
         if height < 1 or width < 1:
+            self.win.noutrefresh()
             return
 
         # Centrar el grid horizontalmente
@@ -96,7 +97,7 @@ class Keyboard:
                 except curses.error:
                     pass
                 x += button_w
-        self.win.refresh()
+        self.win.noutrefresh()
 
     def _attrs_for(
         self, key: KeyDef, focused: bool, highlight: Optional[str] = None

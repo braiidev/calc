@@ -1,10 +1,11 @@
 # TODO
 
 ## Doing
-- [ ] v0.6.3 - Paneles: títulos, alineación de valores, cursor y estados vacíos
+- [ ] v0.6.3 - fix: arranque en negro y resize (bucle KEY_RESIZE + tamaños chicos)
 
 ## Next
-- [ ] v0.6.4 - Teclado: glifos, colores y descripción de tecla enfocada
+- [ ] v0.6.4 - Paneles: títulos, alineación de valores, cursor y estados vacíos
+- [ ] v0.6.5 - Teclado: glifos, colores y descripción de tecla enfocada
 
 ## Done
 - [x] v0.6.2 - Display: barra de estado contextual + live notation

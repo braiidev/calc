@@ -34,6 +34,7 @@ class HelpPanel:
         height, width = self.win.getmaxyx()
         self.win.erase()
         if height < 1 or width < 1:
+            self.win.noutrefresh()
             return
         max_len = max(width - 1, 0)
         for i, line in enumerate(_HELP_LINES):
@@ -45,4 +46,4 @@ class HelpPanel:
                 self.win.addstr(i, 0, shown.ljust(max_len), attr)
             except curses.error:
                 pass
-        self.win.refresh()
+        self.win.noutrefresh()

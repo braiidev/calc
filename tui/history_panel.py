@@ -21,6 +21,7 @@ class HistoryPanel:
         height, width = self.win.getmaxyx()
         self.win.erase()
         if height < 2 or width < 1:
+            self.win.noutrefresh()
             return
 
         # Barra superior
@@ -35,7 +36,7 @@ class HistoryPanel:
                 self.win.addstr(1, 1, "sin entradas", self._attr("hint"))
             except curses.error:
                 pass
-            self.win.refresh()
+            self.win.noutrefresh()
             return
 
         visible = height - 1
@@ -63,7 +64,7 @@ class HistoryPanel:
                 self.win.addstr(y, 0, shown.ljust(max_len), attr)
             except curses.error:
                 pass
-        self.win.refresh()
+        self.win.noutrefresh()
 
     # ----- selección -----
 

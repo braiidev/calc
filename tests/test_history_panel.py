@@ -24,6 +24,9 @@ class StubWin:
     def refresh(self) -> None:
         pass
 
+    def noutrefresh(self) -> None:
+        pass
+
 
 def test_render_incluye_notacion() -> None:
     win = StubWin(10, 40)

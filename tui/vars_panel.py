@@ -32,6 +32,7 @@ class VarsPanel:
         height, width = self.win.getmaxyx()
         self.win.erase()
         if height < 2 or width < 1:
+            self.win.noutrefresh()
             return
 
         try:
@@ -45,7 +46,7 @@ class VarsPanel:
                 self.win.addstr(1, 1, "sin variables", self._attr("hint"))
             except curses.error:
                 pass
-            self.win.refresh()
+            self.win.noutrefresh()
             return
 
         visible = height - 1
@@ -71,7 +72,7 @@ class VarsPanel:
                 self.win.addstr(y, 0, shown.ljust(max_len), attr)
             except curses.error:
                 pass
-        self.win.refresh()
+        self.win.noutrefresh()
 
     # ----- selección -----
 

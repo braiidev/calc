@@ -63,6 +63,7 @@ def make_app() -> App:
     app._edit_counter = 0
     app._last_tray = None
     app._last_tray_edit = -1
+    app.too_small = False
     return app
 
 
@@ -123,6 +124,84 @@ def test_status_text_otros_focos() -> None:
     assert "variables" in app._status_text()
     app.show_help = True
     assert "ayuda" in app._status_text()
+
+
+def test_too_small_solo_permite_salir() -> None:
+    app = make_app()
+    app.too_small = True
+    assert app._handle_key(ord("5")) is False
+    assert app.expression == ""
+    assert app._handle_key(ord("q")) is True
+
+
+class StubStd:
+    def __init__(self, height: int, width: int) -> None:
+        self._size = (height, width)
+
+    def getmaxyx(self) -> tuple[int, int]:
+        return self._size
+
+
+def test_on_resize_no_llama_resizeterm(monkeypatch) -> None:
+    import tui.app as app_module
+
+    called = {"resizeterm": False}
+
+    def boom(*args):
+        called["resizeterm"] = True
+        raise AssertionError("no debe llamarse resizeterm en KEY_RESIZE")
+
+    monkeypatch.setattr(app_module.curses, "resizeterm", boom)
+
+    class Std:
+        def getmaxyx(self):
+            return (5, 20)
+
+        def clear(self):
+            pass
+
+        def refresh(self):
+            pass
+
+    app = make_app()
+    app.stdscr = Std()  # type: ignore[assignment]
+    rebuilt = []
+    app._make_windows = lambda: rebuilt.append(True)  # type: ignore[assignment]
+    app._on_resize()
+    assert rebuilt == [True]
+    assert called["resizeterm"] is False
+
+
+def test_make_windows_too_small_no_crea_ventanas() -> None:
+    app = object.__new__(App)
+    app.stdscr = StubStd(5, 20)  # type: ignore[assignment]
+    app.config = {}
+    app._use_color = False
+    app._make_windows()
+    assert app.too_small is True
+    assert app.display_win is None
+
+
+def test_make_windows_size_ok(monkeypatch) -> None:
+    import tui.app as app_module
+
+    class FakeWin:
+        def __init__(self, height: int, width: int, *args) -> None:
+            self._size = (height, width)
+
+        def getmaxyx(self) -> tuple[int, int]:
+            return self._size
+
+    monkeypatch.setattr(app_module.curses, "newwin", FakeWin)
+    app = object.__new__(App)
+    app.stdscr = StubStd(24, 80)  # type: ignore[assignment]
+    app.calc = Calculator()
+    app.history = History()
+    app.config = {}
+    app._use_color = False
+    app._make_windows()
+    assert app.too_small is False
+    assert app.display_win is not None
 
 
 def test_help_abre_y_cierra() -> None:

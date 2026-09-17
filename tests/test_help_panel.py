@@ -21,6 +21,9 @@ class StubWin:
     def refresh(self) -> None:
         pass
 
+    def noutrefresh(self) -> None:
+        pass
+
 
 def test_render_muestra_secciones() -> None:
     win = StubWin(20, 60)

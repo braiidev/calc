@@ -28,6 +28,8 @@ OPERATOR_LITERALS = "+-*/()%!,="
 
 DISPLAY_H = 4
 KEYBOARD_H = 5
+MIN_ROWS = DISPLAY_H + KEYBOARD_H + 2  # mínimo: display + historial + teclado
+MIN_COLS = 30  # ancho mínimo del grid del teclado (6 * 5)
 
 K_HINT = "teclado  · tab foco · ? ayuda · q salir"
 H_HINT = "historial · tab foco · ? ayuda · q salir"
@@ -67,6 +69,7 @@ class App:
         stdscr.keypad(True)
         curses.curs_set(0)
 
+        self.too_small = False
         self._make_windows()
 
     # ----- setup -----
@@ -84,6 +87,12 @@ class App:
     def _make_windows(self) -> None:
         self._apply_theme()
         height, width = self.stdscr.getmaxyx()
+        self.too_small = height < MIN_ROWS or width < MIN_COLS
+        if self.too_small:
+            self.display_win = None
+            self.history_win = None
+            self.keyboard_win = None
+            return
         kb_top = max(DISPLAY_H, height - KEYBOARD_H)
         self.display_win = curses.newwin(DISPLAY_H, width, 0, 0)
         self.history_win = curses.newwin(kb_top - DISPLAY_H, width, DISPLAY_H, 0)
@@ -99,22 +108,36 @@ class App:
     # ----- loop principal -----
 
     def run(self) -> None:
-        self.stdscr.clearok(
-            True
-        )  # repintado completo inicial (evita negro en tmux/terminales lazy)
+        # Limpieza inicial explícita: sin esto el primer render puede quedar
+        # en negro hasta el primer evento (clearok + refresh de subwindows).
+        self.stdscr.clear()
+        self.stdscr.refresh()
         while True:
             self._render()
             ch = self.stdscr.getch()
             if ch == curses.KEY_RESIZE:
-                curses.resizeterm(*self.stdscr.getmaxyx())
-                self._make_windows()
+                self._on_resize()
                 continue
             if self._handle_key(ch):
                 break
 
+    def _on_resize(self) -> None:
+        """Reconstruir el layout tras un resize.
+
+        Ojo: NO llamar a `curses.resizeterm()` acá. ncurses ya redimensionó
+        `stdscr` al recibir SIGWINCH (su `getmaxyx()` es el nuevo tamaño) y
+        volver a llamarlo re-dispara KEY_RESIZE indefinidamente.
+        """
+        self.stdscr.clear()
+        self.stdscr.refresh()
+        self._make_windows()
+
     # ----- render -----
 
     def _render(self) -> None:
+        if self.too_small:
+            self._render_too_small()
+            return
         # No previsualizar asignaciones (ejecutan sobre el almacén) ni `=`
         if not self.error and not self.pending_confirm:
             if "=" in self.expression:
@@ -144,7 +167,30 @@ class App:
         suffix = self.expression[-2:] if len(self.expression) >= 2 else ""
         highlight = suffix if suffix in ("**", "//") else last
         self.keyboard.render(highlight=highlight)
-        self.stdscr.refresh()
+        curses.doupdate()
+
+    def _render_too_small(self) -> None:
+        """Aviso centrado cuando la terminal no alcanza el tamaño mínimo."""
+        height, width = self.stdscr.getmaxyx()
+        self.stdscr.erase()
+        lines = [
+            "terminal demasiado pequeña",
+            f"mínimo {MIN_COLS}x{MIN_ROWS} · actual {width}x{height}",
+            "agrandá la ventana · q para salir",
+        ]
+        start = max(height // 2 - len(lines) // 2, 0)
+        for i, line in enumerate(lines):
+            y = start + i
+            if y >= height or not line:
+                continue
+            x = max((width - len(line)) // 2, 0)
+            attr = self.attrs.get("error", 0) if i == 0 else self.attrs.get("hint", 0)
+            try:
+                self.stdscr.addstr(y, x, line[: max(width - 1, 0)], attr)
+            except curses.error:
+                pass
+        self.stdscr.noutrefresh()
+        curses.doupdate()
 
     def _status_text(self) -> str:
         """Barra de estado contextual según el foco (o hints fijos si está off)."""
@@ -173,6 +219,8 @@ class App:
 
     def _handle_key(self, ch: int) -> bool:
         """Procesar tecla. Retorna True si la app debe salir."""
+        if self.too_small:  # solo se puede salir hasta agrandar la terminal
+            return ch in (ord("q"), ord("Q"))
         if self.pending_confirm:
             self._process_confirm(ch)
             return False

@@ -23,6 +23,9 @@ class StubWin:
     def refresh(self) -> None:
         pass
 
+    def noutrefresh(self) -> None:
+        pass
+
 
 def _text(win: StubWin) -> str:
     return " ".join(text for _, _, text in win.writes)

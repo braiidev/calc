@@ -81,7 +81,7 @@ class Display:
                     self.win, 3, result, width, attr=self._attr("result")
                 )
 
-        self.win.refresh()
+        self.win.noutrefresh()
 
     @staticmethod
     def _draw_left_aligned(
