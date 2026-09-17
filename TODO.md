@@ -1,11 +1,13 @@
 # TODO
 
 ## Doing
-<!-- vacío: fase v0.6 cerrada -->
+<!-- vacío -->
 
 ## Next
 
 ## Done
+- [x] v0.7.1 - Las asignaciones (`x = 5`) ya no van al historial; solo a variables
+- [x] v0.7 - Persistencia de variables de usuario en `variables.json` (carga al arrancar, guarda al asignar/borrar)
 - [x] v0.6.9 - fix: alinear la fila de funciones con el pad del teclado
 - [x] v0.6.8 - Cierre de fase: VERSION v0.6 e install.sh testeado (overrides CALC_DIR/CALC_BIN)
 - [x] v0.6.7 - Teclado por bloques (mockup B) + glifos Unicode con fallback

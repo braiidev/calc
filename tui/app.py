@@ -1,6 +1,7 @@
 """Aplicación TUI principal: loop de curses y manejo de eventos."""
 
 import curses
+from pathlib import Path
 
 from calculator import Calculator, CalcSyntaxError, CalcMathError
 from models.history import History
@@ -8,6 +9,7 @@ from tui.display import Display
 from tui.help_panel import HelpPanel
 from tui.history_panel import HistoryPanel
 from tui.keyboard import Keyboard
+from tui.persist import load_variables, save_variables, variables_path
 from tui.theme import (
     ensure_config,
     init_colors,
@@ -58,6 +60,8 @@ class App:
     def __init__(self, stdscr) -> None:
         self.stdscr = stdscr
         self.calc = Calculator()
+        self.variables_path: Path | None = variables_path()
+        self.calc.variables.load_user_vars(load_variables(self.variables_path))
         self.history = History()
         self.expression = ""
         self.result_display = ""
@@ -395,7 +399,8 @@ class App:
         elif ch == ord("l"):
             self.vars_panel.to_last()
         elif ch in (ord("d"), ord("D")):
-            self.vars_panel.delete_selected()
+            if self.vars_panel.delete_selected():
+                self._persist_variables()
         elif ch in (ord("x"), ord("X")):
             user_vars = len(self.calc.variables.list_vars()) - len(
                 self.calc.variables.BUILTINS
@@ -408,6 +413,12 @@ class App:
             return False
         return True
 
+    def _persist_variables(self) -> None:
+        """Guardar las variables de usuario (best-effort)."""
+        if self.variables_path is None:
+            return
+        save_variables(self.calc.variables.user_vars(), self.variables_path)
+
     def _ask_confirm(self, message: str, action: str) -> None:
         self.pending_confirm = message
         self._pending_confirm_action = action
@@ -418,6 +429,7 @@ class App:
             if self._pending_confirm_action == "clear_vars":
                 self.calc.variables.clear()
                 self.vars_panel.reset_selection()
+                self._persist_variables()
             else:
                 self.history.clear()
                 self.history_panel.reset_selection()
@@ -507,11 +519,17 @@ class App:
             try:
                 value = self.calc.evaluate(expr)
                 formatted = format_result(value)
-                self.history.add(expr, formatted, self.calc.notation(expr))
-                self.history_panel.reset_selection()
+                is_assignment = "=" in expr
+                if (
+                    not is_assignment
+                ):  # las asignaciones van a variables, no al historial
+                    self.history.add(expr, formatted, self.calc.notation(expr))
+                    self.history_panel.reset_selection()
                 self.result_display = formatted
                 self.error = ""
                 self.just_evaluated = True
+                if is_assignment:
+                    self._persist_variables()
             except (CalcSyntaxError, CalcMathError, ValueError, KeyError) as exc:
                 self.error = str(exc)
             finally:

@@ -1,5 +1,7 @@
 """Tests de la lógica de la TUI (sin curses): bandeja, foco y variables."""
 
+import json
+
 from calculator import Calculator
 from models.history import History
 from tui.app import App
@@ -64,6 +66,7 @@ def make_app() -> App:
     app._last_tray = None
     app._last_tray_edit = -1
     app.too_small = False
+    app.variables_path = None  # sin persistencia por defecto en tests
     return app
 
 
@@ -313,6 +316,40 @@ def test_eval_tolera_igual_tecleado() -> None:
     assert entry is not None
     assert entry.expr == "2+3"
     assert entry.result == "5"
+
+
+def test_asignacion_no_va_al_historial() -> None:
+    app = make_app()
+    for char in "x = 5":
+        app._insert(char)
+    app._handle_action("eval", "")
+    assert len(app.history) == 0
+    assert app.result_display == "5"
+
+
+def test_calculo_si_va_al_historial() -> None:
+    app = make_app()
+    for char in "2+3":
+        app._insert(char)
+    app._handle_action("eval", "")
+    assert len(app.history) == 1
+
+
+def test_asignacion_persiste_variables(tmp_path) -> None:
+    app = make_app()
+    app.variables_path = tmp_path / "variables.json"
+    for char in "x = 5":
+        app._insert(char)
+    app._handle_action("eval", "")
+    assert app.variables_path is not None
+    saved = json.loads(app.variables_path.read_text(encoding="utf-8"))
+    assert saved == {"x": 5.0}
+
+
+def test_persist_sin_path_no_escribe() -> None:
+    app = make_app()
+    app.calc.variables.set("x", 1)
+    app._persist_variables()  # variables_path None: no-op
 
 
 def test_historial_guarda_notacion() -> None:

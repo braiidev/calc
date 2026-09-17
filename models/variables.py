@@ -33,6 +33,22 @@ class Variables:
         """Retornar todas las variables (builtins + usuario)."""
         return {**self.BUILTINS, **self._store}
 
+    def user_vars(self) -> dict[str, float]:
+        """Variables de usuario (sin builtins), como copia."""
+        return dict(self._store)
+
+    def load_user_vars(self, data: dict[str, float]) -> None:
+        """Reemplazar las variables de usuario (ignora builtins y valores inválidos)."""
+        self._store = {
+            name: float(value)
+            for name, value in data.items()
+            if isinstance(name, str)
+            and name.isidentifier()
+            and name not in self.BUILTINS
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        }
+
     def clear(self) -> None:
         """Eliminar todas las variables de usuario."""
         self._store.clear()
