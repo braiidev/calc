@@ -13,6 +13,9 @@ class Display:
         height, width = self.win.getmaxyx()
         self.win.erase()
 
+        # Hint (fila 0)
+        self._draw_left_aligned(self.win, 0, "q salir · esc limpiar", width)
+
         # Expresión (fila 1, alineada a la derecha)
         expr = expression if expression else " "
         self._draw_right_aligned(self.win, 1, expr, width)
@@ -27,6 +30,16 @@ class Display:
             self._draw_right_aligned(self.win, 3, body, width)
 
         self.win.refresh()
+
+    @staticmethod
+    def _draw_left_aligned(win, row: int, text: str, width: int, pad: int = 1) -> None:
+        """Dibujar texto alineado a la izquierda, recortado y con padding."""
+        max_len = max(width - (pad * 2), 0)
+        shown = text if len(text) <= max_len else f"{text[:max_len - 3]}..."
+        try:
+            win.addstr(row, pad, shown)
+        except curses.error:
+            pass
 
     @staticmethod
     def _draw_right_aligned(win, row: int, text: str, width: int, pad: int = 1) -> None:

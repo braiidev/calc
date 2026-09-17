@@ -58,11 +58,15 @@ class App:
     # ----- loop principal -----
 
     def run(self) -> None:
+        self.stdscr.clearok(True)  # repintado completo inicial (evita negro en tmux/terminales lazy)
         while True:
             self._render()
             ch = self.stdscr.getch()
-            if ch == 27:  # ESC
+            if ch in (ord("q"), ord("Q")):  # q/Q: salir
                 break
+            if ch == 27:  # ESC: limpiar
+                self._handle_action("clear", "")
+                continue
             if ch == curses.KEY_RESIZE:
                 curses.resizeterm(*self.stdscr.getmaxyx())
                 self._make_windows()
