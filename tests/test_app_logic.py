@@ -48,12 +48,24 @@ class StubVarsPanel:
         return self.variables.delete(current[0])
 
 
+class StubHelpPanel:
+    def __init__(self) -> None:
+        self.offset = 0
+
+    def scroll_to_top(self) -> None:
+        self.offset = 0
+
+    def scroll(self, delta: int) -> None:
+        self.offset += delta
+
+
 def make_app() -> App:
     app = object.__new__(App)
     app.calc = Calculator()
     app.history = History()
     app.history_panel = StubHistoryPanel(app.history)  # type: ignore[assignment]
     app.vars_panel = StubVarsPanel(app.calc.variables)  # type: ignore[assignment]
+    app.help_panel = StubHelpPanel()  # type: ignore[assignment]
     app.expression = ""
     app.result_display = ""
     app.error = ""
@@ -292,6 +304,25 @@ def test_help_q_sale() -> None:
     app = make_app()
     app.show_help = True
     assert app._handle_key(ord("q")) is True
+
+
+def test_help_jk_desplaza() -> None:
+    app = make_app()
+    app._handle_key(ord("?"))
+    app._handle_key(ord("j"))
+    assert app.help_panel.offset == 1
+    app._handle_key(ord("k"))
+    assert app.help_panel.offset == 0
+    app.help_panel.offset = 5
+    app._handle_key(ord("?"))  # reabrir vuelve arriba
+    app._handle_key(ord("?"))  # y cerrar
+    assert app.help_panel.offset == 0
+
+
+def test_status_menciona_e_editar() -> None:
+    app = make_app()
+    app.focus = "history"
+    assert "e editar" in app._status_text()
 
 
 def test_toggle_focus_ciclo() -> None:

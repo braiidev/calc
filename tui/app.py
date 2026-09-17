@@ -49,9 +49,9 @@ MID_STACK_MIN_ROWS = 18
 # que no cambió.
 TICK_MS = 400
 
-K_HINT = "teclado  · tab foco · ? ayuda · q salir"
-H_HINT = "historial · tab foco · ? ayuda · q salir"
-V_HINT = "variables · tab foco · ? ayuda · q salir"
+K_HINT = "teclado · tab foco · e editar · ? ayuda · q salir"
+H_HINT = "historial · tab foco · e editar · ? ayuda · q salir"
+V_HINT = "variables · tab foco · e editar · ? ayuda · q salir"
 
 _FOCUS_ORDER = ("keyboard", "history", "vars")
 
@@ -269,7 +269,7 @@ class App:
     _NEXT_FOCUS = {"keyboard": "historial", "history": "variables", "vars": "teclado"}
 
     def _status_text(self) -> str:
-        """Barra: `<modo> · <acción bajo cursor> · tab <destino> · ? ayuda · q salir`."""
+        """Barra: `<modo> · <acción bajo cursor> · tab <destino> · e editar · ? ayuda · q salir`."""
         prompt = self.theme.glyphs.get("prompt", ">")
         update = ""
         if self.update_available:
@@ -291,7 +291,7 @@ class App:
             item = self._vars_item()
         mode = self._MODE_LABEL[self.focus]
         nxt = self._NEXT_FOCUS[self.focus]
-        return f"{prompt} {mode} · {item} · tab {nxt} · ? ayuda · q salir{update}"
+        return f"{prompt} {mode} · {item} · tab {nxt} · e editar · ? ayuda · q salir{update}"
 
     def _history_item(self) -> str:
         """Entrada seleccionada del historial como texto `expr = result`."""
@@ -323,11 +323,15 @@ class App:
             self._handle_edit_key(ch)
             return False
 
-        if self.show_help:  # modal: solo cierra o sale
+        if self.show_help:  # modal: cierra, sale o desplaza
             if ch in (ord("?"), 27):
                 self.show_help = False
             elif ch in (ord("q"), ord("Q")):
                 return True
+            elif ch in (ord("j"), curses.KEY_DOWN):
+                self.help_panel.scroll(1)
+            elif ch in (ord("k"), curses.KEY_UP):
+                self.help_panel.scroll(-1)
             return False
 
         if ch == TAB:
@@ -336,6 +340,7 @@ class App:
         if ch in (ord("q"), ord("Q")):
             return True
         if ch == ord("?"):
+            self.help_panel.scroll_to_top()
             self.show_help = True
             return False
         if ch == ord("T"):
