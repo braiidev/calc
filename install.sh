@@ -53,19 +53,30 @@ done
 
 if [ "$ACTION" = "uninstall" ]; then
     echo "== Calculadora TUI — desinstalador =="
-    if [ ! -f "$APP_DIR/main.py" ]; then
+    case "$APP_DIR" in
+        / | "$HOME")
+            echo "Error: APP_DIR inseguro ($APP_DIR); se aborta por seguridad." >&2
+            exit 1
+            ;;
+    esac
+    if [ ! -f "$APP_DIR/main.py" ] || [ ! -f "$APP_DIR/install.sh" ]; then
         echo "Error: no parece una instalación en $APP_DIR." >&2
         exit 1
     fi
     if [ -e "$BIN" ]; then
-        echo "Eliminando wrapper $BIN (pedirá sudo)..."
-        sudo rm -f "$BIN"
+        if ! command -v sudo >/dev/null 2>&1; then
+            echo "Aviso: falta 'sudo'; no se pudo quitar $BIN. Borralo a mano." >&2
+        else
+            echo "Eliminando wrapper $BIN (pedirá sudo)..."
+            sudo rm -f "$BIN"
+        fi
     fi
     if [ "$PURGE" = "1" ]; then
         echo "Eliminando instalación y datos: $APP_DIR"
         rm -rf "$APP_DIR"
     else
         TMP="$(mktemp -d)"
+        trap 'rm -rf "$TMP"' EXIT
         for f in config.json variables.json; do
             if [ -f "$APP_DIR/$f" ]; then
                 cp -p "$APP_DIR/$f" "$TMP/"
@@ -120,6 +131,10 @@ fi
 
 # Crear wrapper (requiere sudo). Se fija la ruta resuelta de $APP_DIR para que
 # el comando funcione sin depender de variables de entorno en runtime.
+if ! command -v sudo >/dev/null 2>&1; then
+    echo "Error: falta 'sudo' para crear el wrapper en $BIN." >&2
+    exit 1
+fi
 echo "Creando wrapper en $BIN (pedirá sudo)..."
 sudo mkdir -p "$(dirname "$BIN")"
 sudo tee "$BIN" >/dev/null <<EOF

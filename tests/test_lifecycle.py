@@ -35,9 +35,46 @@ def test_purge_sin_uninstall_es_error(capsys) -> None:
     assert "solo tiene sentido" in capsys.readouterr().err
 
 
+def test_purge_con_otra_accion_es_error(capsys) -> None:
+    assert main.main(["--update", "--purge"]) == 2
+    assert "solo tiene sentido" in capsys.readouterr().err
+
+
 def test_installed_repo_no_es_el_dev_tree(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CALC_DIR", str(tmp_path / "otro"))
     assert main._installed_repo() is None
+
+
+def test_installed_repo_requiere_marcadores(tmp_path, monkeypatch) -> None:
+    repo = tmp_path / "calc"
+    repo.mkdir()
+    (repo / "main.py").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(main, "_repo_root", lambda: str(repo))
+    monkeypatch.setenv("CALC_DIR", str(repo))
+    assert main._installed_repo() is None  # falta install.sh
+    (repo / "install.sh").write_text("x", encoding="utf-8")
+    assert main._installed_repo() == str(repo)
+
+
+def test_installed_repo_rechaza_home(tmp_path, monkeypatch) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "main.py").write_text("x", encoding="utf-8")
+    (home / "install.sh").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(main, "_repo_root", lambda: str(home))
+    monkeypatch.setenv("CALC_DIR", str(home))
+    monkeypatch.setenv("HOME", str(home))
+    assert main._installed_repo() is None
+
+
+def test_looks_like_wrapper(tmp_path) -> None:
+    wrapper = tmp_path / "calc"
+    wrapper.write_text('#!/bin/bash\nexec python3 /x/main.py "$@"\n', encoding="utf-8")
+    assert main._looks_like_wrapper(str(wrapper))
+    ajeno = tmp_path / "otro"
+    ajeno.write_text("#!/bin/bash\necho hola\n", encoding="utf-8")
+    assert not main._looks_like_wrapper(str(ajeno))
+    assert not main._looks_like_wrapper(str(tmp_path / "noexiste"))
 
 
 def test_uninstall_no_borra_si_no_es_instalacion(tmp_path, monkeypatch, capsys) -> None:
@@ -51,6 +88,7 @@ def test_uninstall_conserva_datos(tmp_path, monkeypatch) -> None:
     repo = tmp_path / "calc"
     repo.mkdir()
     (repo / "main.py").write_text("x", encoding="utf-8")
+    (repo / "install.sh").write_text("x", encoding="utf-8")
     (repo / ".git").mkdir()
     (repo / "config.json").write_text('{"theme": "frio"}', encoding="utf-8")
     (repo / "variables.json").write_text('{"x": 5.0}', encoding="utf-8")
@@ -69,6 +107,7 @@ def test_uninstall_purge_borra_todo(tmp_path, monkeypatch) -> None:
     repo = tmp_path / "calc"
     repo.mkdir()
     (repo / "main.py").write_text("x", encoding="utf-8")
+    (repo / "install.sh").write_text("x", encoding="utf-8")
     (repo / "config.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(main, "_repo_root", lambda: str(repo))
     monkeypatch.setenv("CALC_DIR", str(repo))

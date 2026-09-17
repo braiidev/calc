@@ -419,3 +419,10 @@ def test_cancelar_update_no_aplica() -> None:
     app._process_confirm(ord("n"))
     assert not called
     assert app.pending_confirm is None
+
+
+def test_insert_limpia_mensaje_de_update() -> None:
+    app = make_app()
+    app._update_message = "estás al día (v0.8)"
+    app._insert("5")
+    assert app._update_message == ""

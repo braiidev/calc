@@ -3,9 +3,9 @@
 La instalación es un clone de git en `~/.config/calc` (o `$CALC_DIR`), así que
 la raíz del repo es `parents[1]` de este módulo (`tui/update.py` → `tui` → raíz).
 
-La actualización se decide por **commits** (`git rev-list --count
-HEAD..origin/main`), no por versiones: es inmune al defasaje entre el contador
-de tasks (v0.N) y cualquier semver de producto.
+La actualización se decide por **commits** (`git rev-list --count HEAD..origin/HEAD`,
+con fallback a `origin/main`), no por versiones: es inmune al defasaje entre el
+contador de tasks (v0.N) y cualquier semver de producto.
 """
 
 from __future__ import annotations
@@ -57,6 +57,19 @@ def _short_error(stderr: str, fallback: str) -> str:
     return lines[0] if lines else fallback
 
 
+def _default_branch(repo: str) -> str:
+    """Rama remota por defecto (`origin/main`, `origin/master`, …)."""
+    try:
+        r = _git(repo, ["rev-parse", "--abbrev-ref", "origin/HEAD"])
+        if r.returncode == 0:
+            name = r.stdout.strip()
+            if name.startswith("origin/") and name != "origin/HEAD":
+                return name
+    except Exception:  # noqa: BLE001 — fallback silencioso
+        pass
+    return "origin/main"
+
+
 def _describe(repo: str, rev: str) -> str:
     try:
         r = _git(repo, ["describe", "--tags", rev, "--abbrev=0"])
@@ -79,10 +92,11 @@ class UpdateInfo:
     behind: int = 0
     current: str = ""
     available: str = ""
+    branch: str = "origin/main"
 
 
 def check_update(repo: str) -> UpdateInfo:
-    """Devuelve cuántos commits está detrás `repo` respecto de origin/main."""
+    """Devuelve cuántos commits está detrás `repo` respecto de la rama remota."""
     with _lock:
         return _check_update_unlocked(repo)
 
@@ -94,7 +108,8 @@ def _check_update_unlocked(repo: str) -> UpdateInfo:
         fetch = _git(repo, ["fetch", "origin"], timeout=GIT_TIMEOUT)
         if fetch.returncode != 0:
             return UpdateInfo(False, _short_error(fetch.stderr, "fetch falló"))
-        count = _git(repo, ["rev-list", "--count", "HEAD..origin/main"])
+        branch = _default_branch(repo)
+        count = _git(repo, ["rev-list", "--count", f"HEAD..{branch}"])
         if count.returncode != 0:
             return UpdateInfo(False, _short_error(count.stderr, "rev-list falló"))
         behind = int((count.stdout or "0").strip() or 0)
@@ -102,7 +117,8 @@ def _check_update_unlocked(repo: str) -> UpdateInfo:
             ok=True,
             behind=behind,
             current=_describe(repo, "HEAD"),
-            available=_describe(repo, "origin/main"),
+            available=_describe(repo, branch),
+            branch=branch,
         )
     except FileNotFoundError:
         return UpdateInfo(False, "git no está instalado")
@@ -129,7 +145,7 @@ def do_update(repo: str) -> UpdateResult:
         pull = _git(repo, ["pull", "--ff-only"], timeout=PULL_TIMEOUT)
         if pull.returncode == 0:
             return UpdateResult(True, f"Actualizado a {info.available}")
-        reset = _git(repo, ["reset", "--hard", "origin/main"], timeout=15)
+        reset = _git(repo, ["reset", "--hard", info.branch], timeout=15)
         if reset.returncode == 0:
             return UpdateResult(
                 True, f"Actualizado a {info.available} (historial corregido)"

@@ -23,6 +23,14 @@ def test_do_update_en_dir_sin_git(tmp_path: Path) -> None:
     assert "no es un repositorio" in result.message
 
 
+def test_default_branch_cae_a_origin_main_sin_remoto(tmp_path: Path) -> None:
+    assert update._default_branch(str(tmp_path)) == "origin/main"
+
+
+def test_update_info_branch_por_defecto() -> None:
+    assert update.UpdateInfo(ok=True).branch == "origin/main"
+
+
 def test_auto_update_se_desactiva_por_env(monkeypatch) -> None:
     monkeypatch.delenv("CALC_NO_AUTO_UPDATE", raising=False)
     assert update.is_auto_update_enabled()

@@ -7,6 +7,7 @@
 - [ ] fix: letras `h j k l c d x` no se pueden tipear (navegación vim consume el insert) - v0.7.2 (a decidir esquema)
 
 ## Done
+- [x] v0.8.4 - Auditoría: hardening de uninstall/wrapper, rama remota por defecto, validación de --purge, reinicio robusto
 - [x] v0.8.3 - install.sh con flags (--update/--upgrade/--reinstall/--uninstall [--purge]/--version/--help)
 - [x] v0.8.2 - Update + reinicio en la app: auto-check en background (CALC_NO_AUTO_UPDATE), tecla U, aviso en la barra de estado
 - [x] v0.8.1 - Ciclo de vida en el CLI: `tui/update.py` + `--update`/`--check-update`/`--reinstall`/`--uninstall [--purge]`

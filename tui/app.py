@@ -506,11 +506,15 @@ class App:
 
     def _restart(self) -> None:
         """Reemplazar el proceso actual por uno nuevo (ya con el código nuevo)."""
+        entry = os.path.join(repo_root(), "main.py")
+        if not os.path.isfile(entry):
+            entry = os.path.abspath(sys.argv[0])
+        exe = sys.executable or "python3"
         try:
             curses.endwin()
         except Exception:  # noqa: BLE001 — pase lo que pase, hay que reiniciar
             pass
-        os.execv(sys.executable, [sys.executable, os.path.abspath(sys.argv[0])])
+        os.execv(exe, [exe, entry])
 
     def _ask_confirm(self, message: str, action: str) -> None:
         self.pending_confirm = message
@@ -587,6 +591,7 @@ class App:
 
     def _insert(self, char: str) -> None:
         self.error = ""
+        self._update_message = ""  # al escribir, el aviso de update deja de estorbar
         if self.just_evaluated:
             self.expression = self.result_display + char if char in "+-*/%!." else char
             self.just_evaluated = False

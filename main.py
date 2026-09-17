@@ -61,7 +61,25 @@ def _installed_repo() -> str | None:
     expected = os.path.realpath(
         os.path.expanduser(os.environ.get("CALC_DIR", "~/.config/calc"))
     )
-    return repo if repo == expected else None
+    if repo != expected:
+        return None
+    # Cinturón y tiradores: nunca borrar algo que no sea una instalación real.
+    if repo in ("/", os.path.realpath(os.path.expanduser("~"))):
+        return None
+    if not os.path.isfile(os.path.join(repo, "install.sh")):
+        return None
+    if not os.path.isfile(os.path.join(repo, "main.py")):
+        return None
+    return repo
+
+
+def _looks_like_wrapper(path: str) -> bool:
+    """True si el archivo parece el wrapper que crea install.sh (no un binario ajeno)."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return "main.py" in fh.read(2048)
+    except OSError:
+        return False
 
 
 def _cli_uninstall(purge: bool) -> int:
@@ -80,8 +98,17 @@ def _cli_uninstall(purge: bool) -> int:
     print("Desinstalando calc...")
     bin_path = os.environ.get("CALC_BIN", "/usr/local/bin/calc")
     if os.path.exists(bin_path):
-        print(f"  - eliminando wrapper: {bin_path} (sudo)")
-        subprocess.run(["sudo", "rm", "-f", bin_path], check=False)
+        if _looks_like_wrapper(bin_path):
+            print(f"  - eliminando wrapper: {bin_path} (sudo)")
+            try:
+                subprocess.run(["sudo", "rm", "-f", bin_path], check=False)
+            except OSError as exc:
+                print(f"  ⚠ no se pudo borrar el wrapper: {exc}", file=sys.stderr)
+        else:
+            print(
+                f"  - {bin_path} no parece el wrapper de calc; se conserva",
+                file=sys.stderr,
+            )
 
     if purge:
         print(f"  - eliminando instalación y datos: {repo}")
@@ -129,6 +156,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    if args.purge and not args.uninstall:
+        print(
+            "Error: --purge solo tiene sentido junto con --uninstall", file=sys.stderr
+        )
+        return 2
     if args.update:
         return _cli_update()
     if args.check_update:
@@ -137,11 +169,6 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_reinstall()
     if args.uninstall:
         return _cli_uninstall(args.purge)
-    if args.purge:
-        print(
-            "Error: --purge solo tiene sentido junto con --uninstall", file=sys.stderr
-        )
-        return 2
 
     try:
         curses.wrapper(lambda stdscr: App(stdscr).run())
