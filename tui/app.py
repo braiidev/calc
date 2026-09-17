@@ -32,7 +32,6 @@ KEYBOARD_H = 5
 K_HINT = "teclado  · tab foco · ? ayuda · q salir"
 H_HINT = "historial · tab foco · ? ayuda · q salir"
 V_HINT = "variables · tab foco · ? ayuda · q salir"
-HELP_HINT = "ayuda · ? o esc cerrar · q salir"
 
 _FOCUS_ORDER = ("keyboard", "history", "vars")
 
@@ -89,7 +88,7 @@ class App:
         self.display_win = curses.newwin(DISPLAY_H, width, 0, 0)
         self.history_win = curses.newwin(kb_top - DISPLAY_H, width, DISPLAY_H, 0)
         self.keyboard_win = curses.newwin(height - kb_top, width, kb_top, 0)
-        self.display = Display(self.display_win, self.attrs)
+        self.display = Display(self.display_win, self.attrs, self.theme.glyphs)
         self.history_panel = HistoryPanel(self.history_win, self.history, self.attrs)
         self.vars_panel = VarsPanel(
             self.history_win, self.calc.variables, format_result, self.attrs
@@ -127,12 +126,14 @@ class App:
                     )
                 except (CalcSyntaxError, CalcMathError, ValueError, KeyError):
                     self.result_display = ""
+        notation = ""
+        if self.theme.live_notation and self.expression and not self.error:
+            notation = self.calc.notation(self.expression)
         message = self.pending_confirm or self.error
-        if self.show_help:
-            hint = HELP_HINT
-        else:
-            hint = {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
-        self.display.render(self.expression, self.result_display, message, hint)
+        hint = self._status_text()
+        self.display.render(
+            self.expression, self.result_display, message, hint, notation
+        )
         if self.show_help:
             self.help_panel.render()
         elif self.focus == "vars":
@@ -144,6 +145,29 @@ class App:
         highlight = suffix if suffix in ("**", "//") else last
         self.keyboard.render(highlight=highlight)
         self.stdscr.refresh()
+
+    def _status_text(self) -> str:
+        """Barra de estado contextual según el foco (o hints fijos si está off)."""
+        prompt = self.theme.glyphs.get("prompt", ">")
+        if self.show_help:
+            return f"{prompt} ayuda · ? o esc cerrar · q salir"
+        if not self.theme.status_bar:
+            return {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
+        if self.focus == "keyboard":
+            text = f"{prompt} teclado · ←↑↓→ mover · enter pulsar"
+            desc = self.keyboard.focused_description()
+            if desc:
+                text += f" «{desc}»"
+            return text + " · tab historial · T tema · ? ayuda"
+        if self.focus == "history":
+            return (
+                f"{prompt} historial · j/k mover · enter traer · d borrar · "
+                "x limpiar · tab variables"
+            )
+        return (
+            f"{prompt} variables · j/k mover · enter traer · d borrar · "
+            "x limpiar · tab teclado"
+        )
 
     # ----- entrada -----
 

@@ -3,6 +3,7 @@
 from calculator import Calculator
 from models.history import History
 from tui.app import App
+from tui.theme import resolve_theme
 
 
 class StubHistoryPanel:
@@ -96,6 +97,32 @@ def test_vars_activate_no_duplica() -> None:
     assert app.expression == "5"
     app._vars_activate()
     assert app.expression == "5"
+
+
+def test_status_text_keyboard() -> None:
+    app = make_app()
+    app.theme = resolve_theme({"theme": "auto"}, 24, False)
+
+    class KB:
+        def focused_description(self):
+            return "sumar"
+
+    app.keyboard = KB()  # type: ignore[assignment]
+    text = app._status_text()
+    assert "teclado" in text
+    assert "sumar" in text
+    assert "tab historial" in text
+
+
+def test_status_text_otros_focos() -> None:
+    app = make_app()
+    app.theme = resolve_theme({"theme": "auto"}, 24, False)
+    app.focus = "history"
+    assert "historial" in app._status_text()
+    app.focus = "vars"
+    assert "variables" in app._status_text()
+    app.show_help = True
+    assert "ayuda" in app._status_text()
 
 
 def test_help_abre_y_cierra() -> None:

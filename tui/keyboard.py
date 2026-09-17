@@ -13,28 +13,48 @@ class KeyDef:
     label: str
     action: str = "insert"
     char: Optional[str] = None
+    desc: Optional[str] = None
 
 
 _KEYS = [
     [
-        KeyDef("√", char="sqrt("),
-        KeyDef("root", char="root("),
-        KeyDef("**"),
-        KeyDef("//"),
-        KeyDef("%"),
-        KeyDef("!"),
+        KeyDef("√", char="sqrt(", desc="raíz cuadrada"),
+        KeyDef("root", char="root(", desc="raíz n-ésima"),
+        KeyDef("**", desc="potencia"),
+        KeyDef("//", desc="división entera"),
+        KeyDef("%", desc="módulo"),
+        KeyDef("!", desc="factorial"),
     ],
     [
-        KeyDef("ANS", "ans"),
-        KeyDef("7"),
-        KeyDef("8"),
-        KeyDef("9"),
-        KeyDef("C", "clear"),
-        KeyDef("DEL", "back"),
+        KeyDef("ANS", "ans", desc="traer último resultado"),
+        KeyDef("7", desc="número"),
+        KeyDef("8", desc="número"),
+        KeyDef("9", desc="número"),
+        KeyDef("C", "clear", desc="limpiar"),
+        KeyDef("DEL", "back", desc="borrar"),
     ],
-    [KeyDef("("), KeyDef("4"), KeyDef("5"), KeyDef("6"), KeyDef("+"), KeyDef("-")],
-    [KeyDef(")"), KeyDef("1"), KeyDef("2"), KeyDef("3"), KeyDef("*"), KeyDef("/")],
-    [KeyDef("0"), KeyDef("."), KeyDef(","), KeyDef("=", "eval")],
+    [
+        KeyDef("(", desc="paréntesis"),
+        KeyDef("4", desc="número"),
+        KeyDef("5", desc="número"),
+        KeyDef("6", desc="número"),
+        KeyDef("+", desc="sumar"),
+        KeyDef("-", desc="restar"),
+    ],
+    [
+        KeyDef(")", desc="paréntesis"),
+        KeyDef("1", desc="número"),
+        KeyDef("2", desc="número"),
+        KeyDef("3", desc="número"),
+        KeyDef("*", desc="multiplicar"),
+        KeyDef("/", desc="dividir"),
+    ],
+    [
+        KeyDef("0", desc="número"),
+        KeyDef(".", desc="decimal"),
+        KeyDef(",", desc="separador de argumentos"),
+        KeyDef("=", "eval", desc="evaluar"),
+    ],
 ]
 _BUTTON_IDS: dict[str, tuple[int, int]] = {}
 for _row in range(len(_KEYS)):
@@ -106,6 +126,12 @@ class Keyboard:
         row = _KEYS[self.row]
         key = row[min(self.col, len(row) - 1)]
         return key.action, key.char if key.char is not None else key.label
+
+    def focused_description(self) -> Optional[str]:
+        """Descripción de la tecla enfocada, o None."""
+        row = _KEYS[self.row]
+        key = row[min(self.col, len(row) - 1)]
+        return key.desc
 
     def find_char(self, ch: str) -> Optional[tuple[int, int]]:
         """Resaltar botón cuyo label coincida con la tecla pulsada."""

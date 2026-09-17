@@ -1,26 +1,42 @@
-"""Widget de display: muestra la expresión y el resultado."""
+"""Widget de display: muestra la expresión, el resultado y la notación."""
 
 import curses
 from typing import Optional
 
+_FALLBACK_GLYPHS = {"prompt": ">", "h": "-", "warn": "!"}
+
 
 class Display:
-    """Zona superior: expresión actual, resultado y errores."""
+    """Zona superior: barra de estado, expresión, resultado y errores."""
 
-    def __init__(self, window, attrs: Optional[dict[str, int]] = None) -> None:
+    def __init__(
+        self,
+        window,
+        attrs: Optional[dict[str, int]] = None,
+        glyphs: Optional[dict[str, str]] = None,
+    ) -> None:
         self.win = window
         self.attrs = attrs or {}
+        self.glyphs = {**_FALLBACK_GLYPHS, **(glyphs or {})}
 
     def _attr(self, role: str) -> int:
         return self.attrs.get(role, 0)
 
+    def _glyph(self, name: str) -> str:
+        return self.glyphs.get(name, _FALLBACK_GLYPHS.get(name, ""))
+
     def render(
-        self, expression: str, result: str, error: str = "", hint: str = ""
+        self,
+        expression: str,
+        result: str,
+        error: str = "",
+        hint: str = "",
+        notation: str = "",
     ) -> None:
         height, width = self.win.getmaxyx()
         self.win.erase()
 
-        # Hint (fila 0)
+        # Barra de estado (fila 0)
         self._draw_left_aligned(
             self.win,
             0,
@@ -29,21 +45,36 @@ class Display:
             attr=self._attr("hint"),
         )
 
-        # Expresión (fila 1, alineada a la derecha)
+        # Expresión (fila 1, alineada a la derecha con prompt)
         expr = expression if expression else " "
         self._draw_right_aligned(
-            self.win, 1, expr, width, attr=self._attr("expression")
+            self.win,
+            1,
+            f"{self._glyph('prompt')} {expr}",
+            width,
+            attr=self._attr("expression"),
         )
 
-        # Separador
+        # Separador (fila 2)
         if height >= 3:
-            self.win.addstr(2, 0, "-" * width, self._attr("separator"))
+            try:
+                self.win.addstr(2, 0, self._glyph("h") * width, self._attr("separator"))
+            except curses.error:
+                pass
 
-        # Resultado o error (fila 3)
+        # Notación (dim, a la izquierda) y resultado/error (derecha), fila 3
         if height >= 4:
+            if notation:
+                self._draw_left_aligned(
+                    self.win, 3, notation, width, attr=self._attr("hint")
+                )
             if error:
                 self._draw_right_aligned(
-                    self.win, 3, error, width, attr=self._attr("error")
+                    self.win,
+                    3,
+                    f"{self._glyph('warn')} {error}",
+                    width,
+                    attr=self._attr("error"),
                 )
             else:
                 self._draw_right_aligned(
