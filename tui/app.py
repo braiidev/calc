@@ -15,7 +15,7 @@ KEY_ENTER = (10, 13, curses.KEY_ENTER)
 TAB = 9
 SPACE = 32
 # Caracteres insertables no alfanuméricos (letras = identificadores de variables)
-OPERATOR_LITERALS = "+-*/()%!.:="
+OPERATOR_LITERALS = "+-*/()%!,="
 
 DISPLAY_H = 4
 KEYBOARD_H = 5
@@ -312,7 +312,7 @@ class App:
     def _insert(self, char: str) -> None:
         self.error = ""
         if self.just_evaluated:
-            self.expression = self.result_display + char if char in "+-*/%!.:" else char
+            self.expression = self.result_display + char if char in "+-*/%!." else char
             self.just_evaluated = False
         else:
             self.expression += char

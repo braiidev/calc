@@ -2,9 +2,9 @@
 
 Operadores soportados:
 - Aritmética básica: + - * / ( )
-- División entera: `:` (5:2 = 2)
-- Científica: ** (potencia), // (raíz n-ésima: 8//3 = 2), % (módulo),
-  ! (factorial), sqrt() (raíz cuadrada)
+- División entera: `//` (9 // 4 = 2)
+- Científica: ** (potencia), % (módulo), ! (factorial)
+- Funciones: sqrt(x) (raíz cuadrada), root(x, n) (raíz n-ésima: root(8, 3) = 2)
 - Variables (v0.4): pi, e (builtin) y asignación `x = 5` para uso posterior
 """
 
@@ -22,13 +22,13 @@ class TokType(Enum):
     MINUS = auto()
     MULT = auto()
     DIV = auto()
-    FLDIV = auto()
-    ROOT = auto()
+    FLOORDIV = auto()
     MOD = auto()
     POW = auto()
     FACT = auto()
     ASSIGN = auto()
     IDENT = auto()
+    COMMA = auto()
     LPAREN = auto()
     RPAREN = auto()
     EOF = auto()
@@ -85,6 +85,12 @@ class AssignNode(Node):
     value: Node
 
 
+@dataclass
+class CallNode(Node):
+    name: str
+    args: list[Node]
+
+
 # ---------------- Lexer ----------------
 
 _SINGLE_CHAR: dict[str, TokType] = {
@@ -92,10 +98,10 @@ _SINGLE_CHAR: dict[str, TokType] = {
     "-": TokType.MINUS,
     "*": TokType.MULT,
     "/": TokType.DIV,
-    ":": TokType.FLDIV,
     "%": TokType.MOD,
     "!": TokType.FACT,
     "=": TokType.ASSIGN,
+    ",": TokType.COMMA,
     "(": TokType.LPAREN,
     ")": TokType.RPAREN,
 }
@@ -128,7 +134,7 @@ def tokenize(expr: str) -> list[Token]:
             i += 2
             continue
         if ch == "/" and i + 1 < n and expr[i + 1] == "/":
-            tokens.append(Token(TokType.ROOT, lexeme="//"))
+            tokens.append(Token(TokType.FLOORDIV, lexeme="//"))
             i += 2
             continue
         if ch.isalpha() or ch == "_":
@@ -150,8 +156,8 @@ def tokenize(expr: str) -> list[Token]:
 
 # ---------------- Parser ----------------
 
-# Funciones con notación de llamada: sqrt(x)
-_FUNCTIONS = {"sqrt"}
+# Funciones con notación de llamada (nombre -> aridad): sqrt(x), root(x, n)
+_FUNCTIONS = {"sqrt": 1, "root": 2}
 
 
 class Parser:
@@ -159,18 +165,18 @@ class Parser:
 
     assign  := IDENT '=' assign | expr
     expr    := term (('+' | '-') term)*
-    term    := unary (('*' | '/' | ':' | '//' | '%') unary)*
+    term    := unary (('*' | '/' | '//' | '%') unary)*
     unary   := '-' unary | power
     power   := postfix ('**' unary)?            # asociativa a la derecha
     postfix := primary ('!')*
-    primary := NUMBER | IDENT | '(' expr ')' | IDENT '(' expr ')'
+    primary := NUMBER | IDENT | '(' expr ')'
+             | IDENT '(' expr (',' expr)* ')'
     """
 
     _TERM_OPS = {
         TokType.MULT: "*",
         TokType.DIV: "/",
-        TokType.FLDIV: ":",
-        TokType.ROOT: "//",
+        TokType.FLOORDIV: "//",
         TokType.MOD: "%",
     }
 
@@ -269,9 +275,16 @@ class Parser:
             self._advance()
             if token.lexeme in _FUNCTIONS:
                 self._expect(TokType.LPAREN)
-                arg = self._parse_expr()
+                args = [self._parse_expr()]
+                while self._match(TokType.COMMA):
+                    args.append(self._parse_expr())
                 self._expect(TokType.RPAREN)
-                return UnaryOpNode(token.lexeme, arg)
+                arity = _FUNCTIONS[token.lexeme]
+                if len(args) != arity:
+                    raise CalcSyntaxError(
+                        f"'{token.lexeme}' espera {arity} argumento(s), recibió {len(args)}"
+                    )
+                return CallNode(token.lexeme, args)
             return VarNode(token.lexeme)
         if token.type == TokType.LPAREN:
             self._advance()
@@ -289,13 +302,13 @@ _LABELS: dict[TokType, str] = {
     TokType.MINUS: "-",
     TokType.MULT: "*",
     TokType.DIV: "/",
-    TokType.FLDIV: ":",
-    TokType.ROOT: "//",
+    TokType.FLOORDIV: "//",
     TokType.MOD: "%",
     TokType.POW: "**",
     TokType.FACT: "!",
     TokType.ASSIGN: "=",
     TokType.IDENT: "identificador",
+    TokType.COMMA: ",",
     TokType.LPAREN: "(",
     TokType.RPAREN: ")",
 }
@@ -327,14 +340,23 @@ def evaluate_ast(node: Node, variables: Optional[Variables] = None) -> float:
             return -value
         if node.op == "!":
             return _factorial(value)
-        if node.op == "sqrt":
-            return _sqrt(value)
         raise CalcMathError(f"Operador desconocido: '{node.op}'")
+    if isinstance(node, CallNode):
+        args = [evaluate_ast(arg, variables) for arg in node.args]
+        return _call_function(node.name, args)
     if isinstance(node, BinOpNode):
         left = evaluate_ast(node.left, variables)
         right = evaluate_ast(node.right, variables)
         return _apply_binop(node.op, left, right)
     raise CalcSyntaxError("Nodo desconocido en el árbol de expresión")
+
+
+def _call_function(name: str, args: list[float]) -> float:
+    if name == "sqrt":
+        return _sqrt(args[0])
+    if name == "root":
+        return _root(args[0], args[1])
+    raise CalcMathError(f"Función desconocida: '{name}'")
 
 
 def _lookup_var(variables: Variables, name: str) -> float:
@@ -362,14 +384,10 @@ def _apply_binop(op: str, left: float, right: float) -> float:
         if right == 0:
             raise CalcMathError("División por cero")
         return left / right
-    if op == ":":
+    if op == "//":
         if right == 0:
             raise CalcMathError("División por cero")
-        if left != int(left) or right != int(right):
-            raise CalcMathError("La división entera requiere enteros")
-        return float(int(left) // int(right))
-    if op == "//":
-        return _root(left, right)
+        return float(math.floor(left / right))
     if op == "%":
         if right == 0:
             raise CalcMathError("División por cero")
@@ -383,7 +401,7 @@ def _apply_binop(op: str, left: float, right: float) -> float:
 
 
 def _root(base: float, index: float) -> float:
-    """Raíz n-ésima: base // index == base ** (1/index). `8//3 = 2`."""
+    """Raíz n-ésima: `root(8, 3) == 8 ** (1/3) == 2`."""
     if index == 0:
         raise CalcMathError("Índice de raíz cero")
     negative = base < 0
@@ -427,8 +445,8 @@ class Calculator:
         calc = Calculator()
         result = calc.evaluate("2 + 3 * 4")    # 14.0
         result = calc.evaluate("2 ** 3 !")     # 64.0
-        result = calc.evaluate("8//3")         # 2.0  (raíz cúbica)
-        result = calc.evaluate("5:2")          # 2.0  (división entera)
+        result = calc.evaluate("root(8, 3)")   # 2.0  (raíz cúbica)
+        result = calc.evaluate("9 // 4")       # 2.0  (división entera)
         result = calc.evaluate("x = 5")        # 5.0  (asigna y devuelve)
         result = calc.evaluate("x * 2")        # 10.0 (usa la variable)
     """

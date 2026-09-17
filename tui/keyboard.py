@@ -23,9 +23,9 @@ class KeyDef:
 _KEYS = [
     [
         KeyDef("√", char="sqrt("),
+        KeyDef("root", char="root("),
         KeyDef("**"),
         KeyDef("//"),
-        KeyDef(":"),
         KeyDef("%"),
         KeyDef("!"),
     ],
@@ -39,7 +39,7 @@ _KEYS = [
     ],
     [KeyDef("("), KeyDef("4"), KeyDef("5"), KeyDef("6"), KeyDef("+"), KeyDef("-")],
     [KeyDef(")"), KeyDef("1"), KeyDef("2"), KeyDef("3"), KeyDef("*"), KeyDef("/")],
-    [KeyDef("0"), KeyDef("."), KeyDef("=", "eval")],
+    [KeyDef("0"), KeyDef("."), KeyDef(","), KeyDef("=", "eval")],
 ]
 _BUTTON_IDS: dict[str, tuple[int, int]] = {}
 for _row in range(len(_KEYS)):

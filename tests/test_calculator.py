@@ -30,12 +30,12 @@ def test_basicas(calc: Calculator, expr: str, expected: float) -> None:
 @pytest.mark.parametrize(
     ("expr", "expected"),
     [
-        ("8//3", 2.0),  # raíz cúbica
-        ("27//3", 3.0),
-        ("16//2", 4.0),  # raíz cuadrada
-        ("16//4", 2.0),
-        ("-8//3", -2.0),  # índice impar sobre negativo
-        ("4 + 8//3", 6.0),
+        ("root(8, 3)", 2.0),  # raíz cúbica
+        ("root(27, 3)", 3.0),
+        ("root(16, 2)", 4.0),  # raíz cuadrada
+        ("root(16, 4)", 2.0),
+        ("root(-8, 3)", -2.0),  # índice impar sobre negativo
+        ("4 + root(8, 3)", 6.0),
     ],
 )
 def test_raiz_nesima(calc: Calculator, expr: str, expected: float) -> None:
@@ -45,9 +45,9 @@ def test_raiz_nesima(calc: Calculator, expr: str, expected: float) -> None:
 @pytest.mark.parametrize(
     ("expr", "message"),
     [
-        ("8//0", "Índice de raíz cero"),
-        ("-16//2", "Raíz de índice par sobre número negativo"),
-        ("-8//2.5", "Raíz de número negativo con índice fraccionario"),
+        ("root(8, 0)", "Índice de raíz cero"),
+        ("root(-16, 2)", "Raíz de índice par sobre número negativo"),
+        ("root(-8, 2.5)", "Raíz de número negativo con índice fraccionario"),
     ],
 )
 def test_raiz_errores(calc: Calculator, expr: str, message: str) -> None:
@@ -55,21 +55,30 @@ def test_raiz_errores(calc: Calculator, expr: str, message: str) -> None:
         calc.evaluate(expr)
 
 
+def test_raiz_aridad(calc: Calculator) -> None:
+    with pytest.raises(CalcSyntaxError):
+        calc.evaluate("root(8)")
+    with pytest.raises(CalcSyntaxError):
+        calc.evaluate("root(8, 3, 2)")
+
+
 @pytest.mark.parametrize(
     ("expr", "expected"),
     [
-        ("5:2", 2.0),
-        ("7:3", 2.0),
-        ("9:3", 3.0),
+        ("9 // 4", 2.0),
+        ("7 // 3", 2.0),
+        ("9 // 3", 3.0),
+        ("7.5 // 2", 3.0),  # semántica Python: acepta decimales
+        ("-9 // 4", -3.0),  # redondeo hacia abajo
     ],
 )
 def test_division_entera(calc: Calculator, expr: str, expected: float) -> None:
     assert calc.evaluate(expr) == expected
 
 
-def test_division_entera_requiere_enteros(calc: Calculator) -> None:
-    with pytest.raises(CalcMathError):
-        calc.evaluate("5.5:2")
+def test_division_entera_por_cero(calc: Calculator) -> None:
+    with pytest.raises(CalcMathError, match="División por cero"):
+        calc.evaluate("9 // 0")
 
 
 def test_variables_builtin(calc: Calculator) -> None:
