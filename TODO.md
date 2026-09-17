@@ -4,10 +4,10 @@
 <!-- vacío -->
 
 ## Next
-- [ ] v0.9.7 - README (uso, atajos, operadores, ciclo de vida)
 - [ ] v0.9.8 - Persistir historial entre sesiones (history.json)
 
 ## Done
+- [x] v0.9.7 - README (uso, teclas, operadores, variables, configuración y desarrollo)
 - [x] v0.9.6 - Tests de install.sh en tests/ (+ guard de wrapper ajeno en install.sh --uninstall)
 - [x] v0.9.5 - Cursor en modo edición (flechas/home/end/del, insertar en medio)
 - [x] v0.9.4 - Bump de versión a v0.9 (main.py --version y install.sh)
