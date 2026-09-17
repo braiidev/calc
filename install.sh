@@ -5,8 +5,8 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/braiidev/calc.git}"
-APP_DIR="$HOME/.config/calc"
-BIN="/usr/local/bin/calc"
+APP_DIR="${CALC_DIR:-$HOME/.config/calc}"
+BIN="${CALC_BIN:-/usr/local/bin/calc}"
 
 echo "== Calculadora TUI — instalador =="
 
@@ -37,11 +37,13 @@ if ! python3 -c "import curses" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Crear wrapper (requiere sudo)
+# Crear wrapper (requiere sudo). Se fija la ruta resuelta de $APP_DIR para que
+# el comando funcione sin depender de variables de entorno en runtime.
 echo "Creando wrapper en $BIN (pedirá sudo)..."
-sudo tee "$BIN" >/dev/null <<'EOF'
+sudo mkdir -p "$(dirname "$BIN")"
+sudo tee "$BIN" >/dev/null <<EOF
 #!/bin/bash
-exec python3 "$HOME/.config/calc/main.py" "$@"
+exec python3 "$APP_DIR/main.py" "\$@"
 EOF
 sudo chmod +x "$BIN"
 

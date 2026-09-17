@@ -1,11 +1,12 @@
 # TODO
 
 ## Doing
-- [ ] v0.6.8 - Cierre de fase: bump de VERSION y prueba de install.sh
+<!-- vacío: fase v0.6 cerrada -->
 
 ## Next
 
 ## Done
+- [x] v0.6.8 - Cierre de fase: VERSION v0.6 e install.sh testeado (overrides CALC_DIR/CALC_BIN)
 - [x] v0.6.7 - Teclado por bloques (mockup B) + glifos Unicode con fallback
 - [x] v0.6.6 - Layout adaptativo del medio (D/E/F) + scroll/overflow por panel + divisiones y títulos
 - [x] v0.6.5 - Barra de estado: `<Modo> · «acción bajo cursor» · tab <destino> · ? · q`
