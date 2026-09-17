@@ -32,6 +32,7 @@ class Display:
         error: str = "",
         hint: str = "",
         notation: str = "",
+        cursor: Optional[int] = None,
     ) -> None:
         height, width = self.win.getmaxyx()
         self.win.erase()
@@ -45,15 +46,8 @@ class Display:
             attr=self._attr("hint"),
         )
 
-        # Expresión (fila 1, alineada a la derecha con prompt)
-        expr = expression if expression else " "
-        self._draw_right_aligned(
-            self.win,
-            1,
-            f"{self._glyph('prompt')} {expr}",
-            width,
-            attr=self._attr("expression"),
-        )
+        # Expresión (fila 1, alineada a la derecha, con cursor opcional)
+        self._draw_expression(expression, width, cursor)
 
         # Separador (fila 2)
         if height >= 3:
@@ -82,6 +76,40 @@ class Display:
                 )
 
         self.win.noutrefresh()
+
+    def _draw_expression(
+        self, expression: str, width: int, cursor: Optional[int]
+    ) -> None:
+        """Dibujar la expresión con prompt; si `cursor` no es None, marcarlo."""
+        pad = 1
+        prefix = f"{self._glyph('prompt')} "
+        expr = expression if expression else " "
+        full = prefix + expr
+        max_len = max(width - (pad * 2), 0)
+        if len(full) <= max_len:
+            shown = full
+            dropped = 0
+        else:
+            kept = max(max_len - 3, 0)
+            shown = f"...{full[-kept:]}" if kept else "..."
+            dropped = len(full) - len(shown)
+        x = max(width - pad - len(shown), pad)
+        attr = self._attr("expression")
+        try:
+            self.win.addstr(1, x, shown, attr)
+        except curses.error:
+            pass
+        if cursor is None:
+            return
+        text_idx = len(prefix) + min(max(cursor, 0), len(expr))
+        shown_idx = text_idx - dropped
+        if shown_idx < 0 or x + shown_idx >= width:
+            return
+        char = expr[cursor] if 0 <= cursor < len(expr) else " "
+        try:
+            self.win.addstr(1, x + shown_idx, char, attr | curses.A_REVERSE)
+        except curses.error:
+            pass
 
     @staticmethod
     def _draw_left_aligned(

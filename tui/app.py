@@ -79,6 +79,7 @@ class App:
         self.focus = "keyboard"  # "keyboard" | "history" | "vars"
         self.show_help = False
         self.editing = False  # modo edición: tipeo libre (ver `e`)
+        self.cursor = 0  # posición del cursor dentro de `expression`
         self.pending_confirm: str | None = None
         self._pending_confirm_action: str = "clear_history"
         self._edit_counter = 0
@@ -406,21 +407,70 @@ class App:
     def _enter_edit(self) -> None:
         """Entrar al modo edición: tipeo libre, enter/space evalúa y sale."""
         self.editing = True
+        self.cursor = len(self.expression)
         self.show_help = False
         self.error = ""
         self._update_message = ""
 
     def _handle_edit_key(self, ch: int) -> None:
-        """Teclas en modo edición (todo imprimible salvo espacio se inserta)."""
+        """Teclas en modo edición: texto libre y movimiento de cursor."""
         if ch in KEY_ENTER or ch == SPACE:
             self.editing = False
             self._handle_action("eval", "")
         elif ch == 27:  # esc: salir sin evaluar
             self.editing = False
+        elif ch == curses.KEY_DC:  # del: borrar hacia adelante
+            self._edit_delete()
         elif ch in KEY_BACKSPACE:
-            self._handle_action("back", "")
+            self._edit_backspace()
+        elif ch == curses.KEY_LEFT:
+            self.cursor = max(0, self.cursor - 1)
+        elif ch == curses.KEY_RIGHT:
+            self.cursor = min(len(self.expression), self.cursor + 1)
+        elif ch in (curses.KEY_HOME, 1):  # Home / Ctrl-A
+            self.cursor = 0
+        elif ch in (curses.KEY_END, 5):  # End / Ctrl-E
+            self.cursor = len(self.expression)
         elif 32 < ch <= 126:
-            self._insert(chr(ch))
+            self._insert_at_cursor(chr(ch))
+
+    def _insert_at_cursor(self, text: str) -> None:
+        """Insertar texto en la posición del cursor (modo edición)."""
+        self.error = ""
+        self._update_message = ""
+        if self.just_evaluated:  # empezar de cero tras evaluar
+            self.expression = ""
+            self.cursor = 0
+            self.just_evaluated = False
+            self.result_display = ""
+        pos = min(max(self.cursor, 0), len(self.expression))
+        self.expression = self.expression[:pos] + text + self.expression[pos:]
+        self.cursor = pos + len(text)
+        self._edit_counter += 1
+
+    def _edit_backspace(self) -> None:
+        self.error = ""
+        if self.just_evaluated:
+            self.expression = ""
+            self.cursor = 0
+            self.just_evaluated = False
+            self.result_display = ""
+            self._edit_counter += 1
+            return
+        if self.cursor > 0:
+            self.expression = (
+                self.expression[: self.cursor - 1] + self.expression[self.cursor :]
+            )
+            self.cursor -= 1
+            self._edit_counter += 1
+
+    def _edit_delete(self) -> None:
+        self.error = ""
+        if 0 <= self.cursor < len(self.expression):
+            self.expression = (
+                self.expression[: self.cursor] + self.expression[self.cursor + 1 :]
+            )
+            self._edit_counter += 1
 
     def _handle_keyboard_key(self, ch: int) -> bool:
         """Teclas del foco teclado. Retorna True si se consumieron."""
@@ -641,6 +691,7 @@ class App:
             self.just_evaluated = False
         else:
             self.expression += char
+        self.cursor = len(self.expression)
         self._edit_counter += 1
 
     def _handle_action(self, action: str, char: str) -> None:
@@ -651,10 +702,12 @@ class App:
             self.result_display = ""
             self.error = ""
             self.just_evaluated = False
+            self.cursor = 0
             self._edit_counter += 1
         elif action == "back":
             self.expression = self.expression[:-1]
             self.error = ""
+            self.cursor = len(self.expression)
             self._edit_counter += 1
         elif action == "eval":
             expr = self.expression.strip()

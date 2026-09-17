@@ -16,6 +16,7 @@ _HELP_LINES = [
     "",
     "TECLAS",
     "  e editar (texto libre) · enter/space evaluar · esc salir de edición",
+    "  edición: ←/→ mover · home/end inicio/fin · del borrar",
     "  tab foco · enter/space evaluar o traer valor",
     "  esc/D limpiar · c borrar · d borrar ítem · q salir",
     "  T color · U actualizar · ? ayuda",

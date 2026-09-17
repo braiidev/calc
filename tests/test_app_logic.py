@@ -1,5 +1,6 @@
 """Tests de la lógica de la TUI (sin curses): bandeja, foco y variables."""
 
+import curses
 import json
 
 from calculator import Calculator
@@ -89,6 +90,7 @@ def make_app() -> App:
     app.focus = "keyboard"
     app.show_help = False
     app.editing = False
+    app.cursor = 0
     app.pending_confirm = None
     app._pending_confirm_action = "clear_history"
     app._edit_counter = 0
@@ -567,3 +569,54 @@ def test_normal_si_inserta_digitos_y_operadores() -> None:
     app._handle_key(ord("7"))
     app._handle_key(ord("+"))
     assert app.expression == "7+"
+
+
+def test_edicion_cursor_arranca_al_final() -> None:
+    app = make_app()
+    app.expression = "12+3"
+    app._handle_key(ord("e"))
+    assert app.cursor == 4
+
+
+def test_edicion_inserta_en_medio() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "ab")
+    app._handle_key(curses.KEY_LEFT)
+    app._handle_key(ord("X"))
+    assert app.expression == "aXb"
+    assert app.cursor == 2
+
+
+def test_edicion_mueve_cursor_home_end() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "abc")
+    app._handle_key(curses.KEY_HOME)
+    assert app.cursor == 0
+    app._handle_key(curses.KEY_RIGHT)
+    assert app.cursor == 1
+    app._handle_key(curses.KEY_END)
+    assert app.cursor == 3
+    app._handle_key(curses.KEY_LEFT)
+    assert app.cursor == 2
+
+
+def test_edicion_backspace_en_medio() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "abc")
+    app._handle_key(curses.KEY_LEFT)
+    app._handle_key(127)
+    assert app.expression == "ac"
+    assert app.cursor == 1
+
+
+def test_edicion_delete_borra_adelante() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "abc")
+    app._handle_key(curses.KEY_HOME)
+    app._handle_key(curses.KEY_DC)
+    assert app.expression == "bc"
+    assert app.cursor == 0
