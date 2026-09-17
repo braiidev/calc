@@ -9,12 +9,16 @@ class Display:
     def __init__(self, window) -> None:
         self.win = window
 
-    def render(self, expression: str, result: str, error: str = "", hint: str = "") -> None:
+    def render(
+        self, expression: str, result: str, error: str = "", hint: str = ""
+    ) -> None:
         height, width = self.win.getmaxyx()
         self.win.erase()
 
         # Hint (fila 0)
-        self._draw_left_aligned(self.win, 0, hint if hint else "q salir · esc limpiar", width)
+        self._draw_left_aligned(
+            self.win, 0, hint if hint else "q salir · esc limpiar", width
+        )
 
         # Expresión (fila 1, alineada a la derecha)
         expr = expression if expression else " "

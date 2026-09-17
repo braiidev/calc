@@ -40,7 +40,7 @@ class App:
         self.result_display = ""
         self.error = ""
         self.just_evaluated = False
-        self.focus = "keyboard"   # "keyboard" | "history"
+        self.focus = "keyboard"  # "keyboard" | "history"
         self.pending_confirm: str | None = None
 
         self._init_colors()
@@ -73,7 +73,9 @@ class App:
     # ----- loop principal -----
 
     def run(self) -> None:
-        self.stdscr.clearok(True)  # repintado completo inicial (evita negro en tmux/terminales lazy)
+        self.stdscr.clearok(
+            True
+        )  # repintado completo inicial (evita negro en tmux/terminales lazy)
         while True:
             self._render()
             ch = self.stdscr.getch()
@@ -90,7 +92,7 @@ class App:
         if not self.error and not self.pending_confirm:
             try:
                 self.result_display = format_result(self.calc.evaluate(self.expression))
-            except (CalcSyntaxError, CalcMathError, ValueError):
+            except (CalcSyntaxError, CalcMathError, ValueError, KeyError):
                 self.result_display = ""
         message = self.pending_confirm or self.error
         hint = H_HINT if self.focus == "history" else K_HINT

@@ -20,7 +20,10 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     except Exception as exc:  # noqa: BLE001 — proteger la terminal
-        curses.endwin()
+        try:
+            curses.endwin()
+        except Exception:
+            pass
         print(f"Error fatal: {exc}", file=sys.stderr)
         return 1
     return 0

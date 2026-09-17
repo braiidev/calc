@@ -38,7 +38,7 @@ class HistoryPanel:
         start = 0
         if total > visible:
             start = min(max(self.selected - visible // 2, 0), total - visible)
-        rows = self.history.last(total)[start: start + visible]
+        rows = self.history.last(total)[start : start + visible]
 
         for i, (expr, result) in enumerate(rows):
             y = 1 + i
