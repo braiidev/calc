@@ -85,6 +85,39 @@ def test_argumento_invalido(tmp_path: Path) -> None:
     assert "desconocido" in r.stderr
 
 
+def _sh_env(tmp_path: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env["CALC_DIR"] = str(tmp_path / "app")
+    env["CALC_BIN"] = str(tmp_path / "calc")
+    return env
+
+
+def test_funciona_con_sh_posix(tmp_path: Path) -> None:
+    r = subprocess.run(
+        ["sh", str(INSTALL), "--version"],
+        capture_output=True,
+        text=True,
+        env=_sh_env(tmp_path),
+        timeout=60,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "v0.9" in r.stdout
+
+
+def test_piped_via_sh(tmp_path: Path) -> None:
+    with INSTALL.open() as script:
+        r = subprocess.run(
+            ["sh", "-s", "--", "--version"],
+            stdin=script,
+            capture_output=True,
+            text=True,
+            env=_sh_env(tmp_path),
+            timeout=60,
+        )
+    assert r.returncode == 0, r.stderr
+    assert "v0.9" in r.stdout
+
+
 def test_uninstall_rechaza_app_dir_inseguro(tmp_path: Path) -> None:
     r = _run(["--uninstall"], calc_dir=Path("/"), calc_bin=tmp_path / "calc")
     assert r.returncode == 1

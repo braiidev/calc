@@ -6,6 +6,7 @@
 ## Next
 
 ## Done
+- [x] v0.9.9 - fix: install.sh compatible con `sh` (dash) para `curl | sh` (sin `set -o pipefail` en sh)
 - [x] v0.9.8 - Historial persistente entre sesiones (`history.json`, carga/guarda con escritura atómica)
 - [x] v0.9.7 - README (uso, teclas, operadores, variables, configuración y desarrollo)
 - [x] v0.9.6 - Tests de install.sh en tests/ (+ guard de wrapper ajeno en install.sh --uninstall)

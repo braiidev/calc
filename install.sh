@@ -5,7 +5,11 @@
 #
 # --uninstall conserva config.json y variables.json; agregá --purge para borrarlos.
 
-set -euo pipefail
+# Compatible con `sh` (dash). `pipefail` solo existe en bash, se activa si está.
+set -eu
+if [ -n "${BASH_VERSION:-}" ]; then
+    set -o pipefail
+fi
 
 REPO_URL="${REPO_URL:-https://github.com/braiidev/calc.git}"
 APP_DIR="${CALC_DIR:-$HOME/.config/calc}"
