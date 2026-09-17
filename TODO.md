@@ -1,11 +1,14 @@
 # TODO
 
 ## Doing
-- [ ] v0.6 - Estética TUI: layout, colores y hints (a definir con el usuario)
+- [ ] v0.6.2 - Display: barra de estado contextual + live notation
 
 ## Next
+- [ ] v0.6.3 - Paneles: títulos, alineación de valores, cursor y estados vacíos
+- [ ] v0.6.4 - Teclado: glifos, colores y descripción de tecla enfocada
 
 ## Done
+- [x] v0.6.1 - theme.py + config.json + tecla T (ciclar temas) y colores por rol
 - [x] v0.5.3 - Leyenda toggleable de operadores/teclas con `?`
 - [x] v0.5.2 - Notación semántica en historial (`[floor]`, `[sqrt]`, `[cbrt]`, `[nroot]`)
 - [x] v0.5.1 - `//` división entera, `root(x, n)` raíz n-ésima, fuera `:`

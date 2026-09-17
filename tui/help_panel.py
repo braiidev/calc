@@ -16,15 +16,19 @@ _HELP_LINES = [
     "",
     "TECLAS",
     "  tab foco · enter/space evaluar o traer valor",
-    "  esc/D limpiar · c borrar · d borrar ítem · ? ayuda · q salir",
+    "  esc/D limpiar · c borrar · d borrar ítem · T tema · ? ayuda · q salir",
 ]
 
 
 class HelpPanel:
     """Dibuja la leyenda de ayuda en la ventana central (modal)."""
 
-    def __init__(self, window) -> None:
+    def __init__(self, window, attrs=None) -> None:
         self.win = window
+        self.attrs = attrs or {}
+
+    def _attr(self, role: str) -> int:
+        return self.attrs.get(role, 0)
 
     def render(self) -> None:
         height, width = self.win.getmaxyx()
@@ -36,7 +40,7 @@ class HelpPanel:
             if i >= height:
                 break
             shown = line if len(line) <= max_len else line[:max_len]
-            attr = curses.A_BOLD if line.isupper() else 0
+            attr = self._attr("title") if line.isupper() else self._attr("expression")
             try:
                 self.win.addstr(i, 0, shown.ljust(max_len), attr)
             except curses.error:

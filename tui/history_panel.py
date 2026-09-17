@@ -8,10 +8,14 @@ from models.history import HistoryEntry
 class HistoryPanel:
     """Muestra el historial con una entrada seleccionada (cursor) y auto-scroll."""
 
-    def __init__(self, window, history) -> None:
+    def __init__(self, window, history, attrs=None) -> None:
         self.win = window
         self.history = history
+        self.attrs = attrs or {}
         self.selected = -1  # índice absoluto en el historial (-1 = nada)
+
+    def _attr(self, role: str) -> int:
+        return self.attrs.get(role, 0)
 
     def render(self) -> None:
         height, width = self.win.getmaxyx()
@@ -21,14 +25,14 @@ class HistoryPanel:
 
         # Barra superior
         try:
-            self.win.addstr(0, 0, "=" * width)
+            self.win.addstr(0, 0, "=" * width, self._attr("separator"))
         except curses.error:
             pass
 
         total = len(self.history)
         if total == 0:
             try:
-                self.win.addstr(1, 1, "sin entradas", curses.A_DIM)
+                self.win.addstr(1, 1, "sin entradas", self._attr("hint"))
             except curses.error:
                 pass
             self.win.refresh()
@@ -46,10 +50,10 @@ class HistoryPanel:
             y = 1 + i
             if y >= height:
                 break
-            cursor, attr = (" ", curses.A_DIM)
+            cursor, attr = (" ", self._attr("expression"))
             if start + i == self.selected:
                 cursor = ">"
-                attr = curses.A_NORMAL
+                attr = self._attr("selection")
             text = f"{cursor} {entry.expr} = {entry.result}"
             if entry.notation:
                 text += f"  {entry.notation}"

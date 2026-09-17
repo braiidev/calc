@@ -10,12 +10,20 @@ class VarsPanel:
     """Muestra las variables con cursor, auto-scroll y borrado."""
 
     def __init__(
-        self, window, variables: Variables, formatter: Callable[[float], str]
+        self,
+        window,
+        variables: Variables,
+        formatter: Callable[[float], str],
+        attrs=None,
     ) -> None:
         self.win = window
         self.variables = variables
         self.formatter = formatter
+        self.attrs = attrs or {}
         self.selected = -1  # índice absoluto en la lista (-1 = nada)
+
+    def _attr(self, role: str) -> int:
+        return self.attrs.get(role, 0)
 
     def _items(self) -> list[tuple[str, float]]:
         return list(self.variables.list_vars().items())
@@ -27,14 +35,14 @@ class VarsPanel:
             return
 
         try:
-            self.win.addstr(0, 0, "=" * width)
+            self.win.addstr(0, 0, "=" * width, self._attr("separator"))
         except curses.error:
             pass
 
         items = self._items()
         if not items:
             try:
-                self.win.addstr(1, 1, "sin variables", curses.A_DIM)
+                self.win.addstr(1, 1, "sin variables", self._attr("hint"))
             except curses.error:
                 pass
             self.win.refresh()
@@ -52,10 +60,10 @@ class VarsPanel:
             y = 1 + i
             if y >= height:
                 break
-            cursor, attr = (" ", curses.A_DIM)
+            cursor, attr = (" ", self._attr("expression"))
             if start + i == self.selected:
                 cursor = ">"
-                attr = curses.A_NORMAL
+                attr = self._attr("selection")
             text = f"{cursor} {name} = {self.formatter(value)}"
             max_len = max(width - 1, 0)
             shown = text if len(text) <= max_len else f"{text[:max_len - 3]}..."

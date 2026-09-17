@@ -7,7 +7,15 @@ from models.history import History
 from tui.display import Display
 from tui.help_panel import HelpPanel
 from tui.history_panel import HistoryPanel
-from tui.keyboard import Keyboard, PAIR_NUM, PAIR_OP, PAIR_ACTION
+from tui.keyboard import Keyboard
+from tui.theme import (
+    ensure_config,
+    init_colors,
+    next_theme,
+    resolve_theme,
+    role_attrs,
+    save_config,
+)
 from tui.vars_panel import VarsPanel
 
 # Código de tecla: backspace puede venir como 127 o 8
@@ -55,7 +63,8 @@ class App:
         self._last_tray: tuple | None = None
         self._last_tray_edit = -1
 
-        self._init_colors()
+        self.config = ensure_config()
+        self._use_color = init_colors()
         stdscr.keypad(True)
         curses.curs_set(0)
 
@@ -63,28 +72,30 @@ class App:
 
     # ----- setup -----
 
-    def _init_colors(self) -> None:
-        if not curses.has_colors():
-            return
-        curses.start_color()
-        curses.use_default_colors()
-        curses.init_pair(PAIR_NUM, curses.COLOR_WHITE, -1)
-        curses.init_pair(PAIR_OP, curses.COLOR_CYAN, -1)
-        curses.init_pair(PAIR_ACTION, curses.COLOR_YELLOW, -1)
+    def _apply_theme(self) -> None:
+        rows = self.stdscr.getmaxyx()[0]
+        self.theme = resolve_theme(self.config, rows, self._use_color)
+        self.attrs = role_attrs(self.theme, self._use_color)
+
+    def _cycle_theme(self) -> None:
+        self.config["theme"] = next_theme(self.theme.name)
+        save_config(self.config)
+        self._apply_theme()
 
     def _make_windows(self) -> None:
+        self._apply_theme()
         height, width = self.stdscr.getmaxyx()
         kb_top = max(DISPLAY_H, height - KEYBOARD_H)
         self.display_win = curses.newwin(DISPLAY_H, width, 0, 0)
         self.history_win = curses.newwin(kb_top - DISPLAY_H, width, DISPLAY_H, 0)
         self.keyboard_win = curses.newwin(height - kb_top, width, kb_top, 0)
-        self.display = Display(self.display_win)
-        self.history_panel = HistoryPanel(self.history_win, self.history)
+        self.display = Display(self.display_win, self.attrs)
+        self.history_panel = HistoryPanel(self.history_win, self.history, self.attrs)
         self.vars_panel = VarsPanel(
-            self.history_win, self.calc.variables, format_result
+            self.history_win, self.calc.variables, format_result, self.attrs
         )
-        self.help_panel = HelpPanel(self.history_win)
-        self.keyboard = Keyboard(self.keyboard_win)
+        self.help_panel = HelpPanel(self.history_win, self.attrs)
+        self.keyboard = Keyboard(self.keyboard_win, self.attrs)
 
     # ----- loop principal -----
 
@@ -156,6 +167,9 @@ class App:
             return True
         if ch == ord("?"):
             self.show_help = True
+            return False
+        if ch == ord("T"):
+            self._cycle_theme()
             return False
         if ch == 27:  # ESC: limpiar display
             self._handle_action("clear", "")

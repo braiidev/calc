@@ -4,11 +4,6 @@ import curses
 from dataclasses import dataclass
 from typing import Optional
 
-# Pares de color (inicializados desde la app)
-PAIR_NUM = 1
-PAIR_OP = 2
-PAIR_ACTION = 3
-
 _ACTIONS = ("insert", "clear", "back", "eval", "ans")
 _GRID_COLS = 6
 
@@ -51,11 +46,11 @@ for _row in range(len(_KEYS)):
 class Keyboard:
     """Grid de botones con navegación por flechas y resaltado de tecla."""
 
-    def __init__(self, window) -> None:
+    def __init__(self, window, attrs: Optional[dict[str, int]] = None) -> None:
         self.win = window
+        self.attrs = attrs or {}
         self.row = 0
         self.col = 0
-        self.use_colors = curses.has_colors()
 
     def render(self, highlight: Optional[str] = None) -> None:
         height, width = self.win.getmaxyx()
@@ -86,19 +81,16 @@ class Keyboard:
     def _attrs_for(
         self, key: KeyDef, focused: bool, highlight: Optional[str] = None
     ) -> int:
-        """Atributos del botón: A_REVERSE + color (A_REVERSE funciona sin soporte de color)."""
-        attrs = 0
+        """Atributos del botón: color por rol + A_REVERSE si está enfocado."""
+        if key.action != "insert":
+            role = "action"
+        elif key.label.isdigit() or key.label in (".", ","):
+            role = "number"
+        else:
+            role = "operator"
+        attrs = self.attrs.get(role, 0)
         if focused or (highlight is not None and key.label == highlight):
             attrs |= curses.A_REVERSE
-        if self.use_colors:
-            if key.action == "insert":
-                if key.label.isdigit() or key.label == ".":
-                    pair = PAIR_NUM
-                else:
-                    pair = PAIR_OP
-            else:
-                pair = PAIR_ACTION
-            attrs |= curses.color_pair(pair)
         return attrs
 
     # ----- navegación -----
