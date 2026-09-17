@@ -1,9 +1,9 @@
 """Widget del panel de variables (builtins + usuario)."""
 
-import curses
 from typing import Callable
 
 from models.variables import Variables
+from tui.parts import compute_view, draw_frame, draw_line, overflow_text
 
 
 class VarsPanel:
@@ -15,11 +15,17 @@ class VarsPanel:
         variables: Variables,
         formatter: Callable[[float], str],
         attrs=None,
+        glyphs=None,
+        bordered: bool = False,
+        title: str = "VARIABLES",
     ) -> None:
         self.win = window
         self.variables = variables
         self.formatter = formatter
         self.attrs = attrs or {}
+        self.glyphs = glyphs or {}
+        self.bordered = bordered
+        self.title = title
         self.selected = -1  # índice absoluto en la lista (-1 = nada)
 
     def _attr(self, role: str) -> int:
@@ -28,50 +34,66 @@ class VarsPanel:
     def _items(self) -> list[tuple[str, float]]:
         return list(self.variables.list_vars().items())
 
-    def render(self) -> None:
+    def render(self, active: bool = True) -> None:
         height, width = self.win.getmaxyx()
         self.win.erase()
         if height < 2 or width < 1:
             self.win.noutrefresh()
             return
 
-        try:
-            self.win.addstr(0, 0, "=" * width, self._attr("separator"))
-        except curses.error:
-            pass
+        title_attr = self._attr("title") if active else self._attr("title_dim")
+        top, left, content_h, content_w = draw_frame(
+            self.win,
+            self.title,
+            self.bordered,
+            {**self.attrs, "title": title_attr},
+            self.glyphs,
+        )
 
         items = self._items()
         if not items:
-            try:
-                self.win.addstr(1, 1, "sin variables", self._attr("hint"))
-            except curses.error:
-                pass
+            draw_line(
+                self.win, top, left, content_w, "sin variables", self._attr("hint")
+            )
             self.win.noutrefresh()
             return
 
-        visible = height - 1
         if self.selected < 0:
             self.selected = len(items) - 1
-        start = 0
-        if len(items) > visible:
-            start = min(max(self.selected - visible // 2, 0), len(items) - visible)
-        rows = items[start : start + visible]
+        start, count, top_ind, bottom_ind = compute_view(
+            len(items), self.selected, content_h
+        )
 
-        for i, (name, value) in enumerate(rows):
-            y = 1 + i
-            if y >= height:
-                break
-            cursor, attr = (" ", self._attr("expression"))
-            if start + i == self.selected:
-                cursor = ">"
-                attr = self._attr("selection")
-            text = f"{cursor} {name} = {self.formatter(value)}"
-            max_len = max(width - 1, 0)
-            shown = text if len(text) <= max_len else f"{text[:max_len - 3]}..."
-            try:
-                self.win.addstr(y, 0, shown.ljust(max_len), attr)
-            except curses.error:
-                pass
+        cursor = self.glyphs.get("cursor", ">")
+        row = top
+        if top_ind:
+            draw_line(
+                self.win,
+                row,
+                left,
+                content_w,
+                overflow_text(self.glyphs, "up", start),
+                self._attr("hint"),
+            )
+            row += 1
+        for i in range(count):
+            idx = start + i
+            name, value = items[idx]
+            cur, attr = (" ", self._attr("expression"))
+            if idx == self.selected:
+                cur, attr = cursor, self._attr("selection")
+            text = f"{cur} {name} = {self.formatter(value)}"
+            draw_line(self.win, row, left, content_w, text, attr)
+            row += 1
+        if bottom_ind:
+            draw_line(
+                self.win,
+                row,
+                left,
+                content_w,
+                overflow_text(self.glyphs, "down", len(items) - (start + count)),
+                self._attr("hint"),
+            )
         self.win.noutrefresh()
 
     # ----- selección -----

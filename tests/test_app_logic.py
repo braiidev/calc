@@ -224,6 +224,39 @@ def test_make_windows_size_ok(monkeypatch) -> None:
     app._make_windows()
     assert app.too_small is False
     assert app.display_win is not None
+    assert app.mid_layout == "D"  # 80 >= 70: historial | variables
+    assert app.vars_win is not None
+
+
+def test_pick_mid_layout() -> None:
+    assert App._pick_mid_layout(24, 80) == "D"
+    assert App._pick_mid_layout(18, 40) == "E"
+    assert App._pick_mid_layout(24, 69) == "E"
+    assert App._pick_mid_layout(17, 40) == "F"
+    assert App._pick_mid_layout(11, 30) == "F"
+
+
+def test_make_windows_layout_apilado(monkeypatch) -> None:
+    import tui.app as app_module
+
+    class FakeWin:
+        def __init__(self, height: int, width: int, *args) -> None:
+            self._size = (height, width)
+
+        def getmaxyx(self) -> tuple[int, int]:
+            return self._size
+
+    monkeypatch.setattr(app_module.curses, "newwin", FakeWin)
+    app = object.__new__(App)
+    app.stdscr = StubStd(20, 40)  # type: ignore[assignment]
+    app.calc = Calculator()
+    app.history = History()
+    app.config = {}
+    app._use_color = False
+    app._make_windows()
+    assert app.mid_layout == "E"
+    assert app.history_win is not None
+    assert app.vars_win is not None
 
 
 def test_help_abre_y_cierra() -> None:

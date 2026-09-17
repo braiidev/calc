@@ -31,6 +31,13 @@ KEYBOARD_H = 5
 MIN_ROWS = DISPLAY_H + KEYBOARD_H + 2  # mínimo: display + historial + teclado
 MIN_COLS = 30  # ancho mínimo del grid del teclado (6 * 5)
 
+# Layout del panel central:
+#   D = historial | variables en paralelo (ancho suficiente)
+#   E = historial arriba / variables abajo (alto suficiente)
+#   F = una sola sección, la del foco (espacio reducido)
+MID_WIDE_MIN_COLS = 70
+MID_STACK_MIN_ROWS = 18
+
 K_HINT = "teclado  · tab foco · ? ayuda · q salir"
 H_HINT = "historial · tab foco · ? ayuda · q salir"
 V_HINT = "variables · tab foco · ? ayuda · q salir"
@@ -70,6 +77,7 @@ class App:
         curses.curs_set(0)
 
         self.too_small = False
+        self.mid_layout = "F"
         self._make_windows()
 
     # ----- setup -----
@@ -84,6 +92,15 @@ class App:
         save_config(self.config)
         self._apply_theme()
 
+    @staticmethod
+    def _pick_mid_layout(height: int, width: int) -> str:
+        """Elegir D/E/F según el espacio disponible."""
+        if width >= MID_WIDE_MIN_COLS:
+            return "D"
+        if height >= MID_STACK_MIN_ROWS:
+            return "E"
+        return "F"
+
     def _make_windows(self) -> None:
         self._apply_theme()
         height, width = self.stdscr.getmaxyx()
@@ -91,18 +108,44 @@ class App:
         if self.too_small:
             self.display_win = None
             self.history_win = None
+            self.vars_win = None
             self.keyboard_win = None
+            self.help_win = None
             return
-        kb_top = max(DISPLAY_H, height - KEYBOARD_H)
+        self.mid_layout = self._pick_mid_layout(height, width)
+        kb_top = height - KEYBOARD_H
+        mid_h = kb_top - DISPLAY_H
+        bordered = self.theme.style == "boxed"
+        glyphs = self.theme.glyphs
+
         self.display_win = curses.newwin(DISPLAY_H, width, 0, 0)
-        self.history_win = curses.newwin(kb_top - DISPLAY_H, width, DISPLAY_H, 0)
-        self.keyboard_win = curses.newwin(height - kb_top, width, kb_top, 0)
-        self.display = Display(self.display_win, self.attrs, self.theme.glyphs)
-        self.history_panel = HistoryPanel(self.history_win, self.history, self.attrs)
-        self.vars_panel = VarsPanel(
-            self.history_win, self.calc.variables, format_result, self.attrs
+        self.keyboard_win = curses.newwin(KEYBOARD_H, width, kb_top, 0)
+        self.help_win = curses.newwin(mid_h, width, DISPLAY_H, 0)
+        if self.mid_layout == "D":
+            left_w = width // 2
+            self.history_win = curses.newwin(mid_h, left_w, DISPLAY_H, 0)
+            self.vars_win = curses.newwin(mid_h, width - left_w, DISPLAY_H, left_w)
+        elif self.mid_layout == "E":
+            hist_h = mid_h // 2
+            self.history_win = curses.newwin(hist_h, width, DISPLAY_H, 0)
+            self.vars_win = curses.newwin(mid_h - hist_h, width, DISPLAY_H + hist_h, 0)
+        else:  # F: ambos paneles ocupan el medio, se muestra el del foco
+            self.history_win = curses.newwin(mid_h, width, DISPLAY_H, 0)
+            self.vars_win = curses.newwin(mid_h, width, DISPLAY_H, 0)
+
+        self.display = Display(self.display_win, self.attrs, glyphs)
+        self.history_panel = HistoryPanel(
+            self.history_win, self.history, self.attrs, glyphs, bordered
         )
-        self.help_panel = HelpPanel(self.history_win, self.attrs)
+        self.vars_panel = VarsPanel(
+            self.vars_win,
+            self.calc.variables,
+            format_result,
+            self.attrs,
+            glyphs,
+            bordered,
+        )
+        self.help_panel = HelpPanel(self.help_win, self.attrs)
         self.keyboard = Keyboard(self.keyboard_win, self.attrs)
 
     # ----- loop principal -----
@@ -159,10 +202,14 @@ class App:
         )
         if self.show_help:
             self.help_panel.render()
-        elif self.focus == "vars":
-            self.vars_panel.render()
+        elif self.mid_layout == "F":
+            if self.focus == "vars":
+                self.vars_panel.render(active=True)
+            else:
+                self.history_panel.render(active=True)
         else:
-            self.history_panel.render()
+            self.history_panel.render(active=self.focus == "history")
+            self.vars_panel.render(active=self.focus == "vars")
         last = self.expression[-1] if self.expression else None
         suffix = self.expression[-2:] if len(self.expression) >= 2 else ""
         highlight = suffix if suffix in ("**", "//") else last

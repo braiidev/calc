@@ -1,69 +1,96 @@
 """Widget del panel de historial de operaciones."""
 
-import curses
-
 from models.history import HistoryEntry
+from tui.parts import compute_view, draw_frame, draw_line, overflow_text
 
 
 class HistoryPanel:
     """Muestra el historial con una entrada seleccionada (cursor) y auto-scroll."""
 
-    def __init__(self, window, history, attrs=None) -> None:
+    def __init__(
+        self,
+        window,
+        history,
+        attrs=None,
+        glyphs=None,
+        bordered: bool = False,
+        title: str = "HISTORIAL",
+    ) -> None:
         self.win = window
         self.history = history
         self.attrs = attrs or {}
+        self.glyphs = glyphs or {}
+        self.bordered = bordered
+        self.title = title
         self.selected = -1  # índice absoluto en el historial (-1 = nada)
 
     def _attr(self, role: str) -> int:
         return self.attrs.get(role, 0)
 
-    def render(self) -> None:
+    def render(self, active: bool = True) -> None:
         height, width = self.win.getmaxyx()
         self.win.erase()
         if height < 2 or width < 1:
             self.win.noutrefresh()
             return
 
-        # Barra superior
-        try:
-            self.win.addstr(0, 0, "=" * width, self._attr("separator"))
-        except curses.error:
-            pass
+        title_attr = self._attr("title") if active else self._attr("title_dim")
+        top, left, content_h, content_w = draw_frame(
+            self.win,
+            self.title,
+            self.bordered,
+            {**self.attrs, "title": title_attr},
+            self.glyphs,
+        )
 
         total = len(self.history)
         if total == 0:
-            try:
-                self.win.addstr(1, 1, "sin entradas", self._attr("hint"))
-            except curses.error:
-                pass
+            draw_line(
+                self.win, top, left, content_w, "sin entradas", self._attr("hint")
+            )
             self.win.noutrefresh()
             return
 
-        visible = height - 1
         if self.selected < 0:
             self.selected = total - 1
-        start = 0
-        if total > visible:
-            start = min(max(self.selected - visible // 2, 0), total - visible)
-        rows = self.history.last(total)[start : start + visible]
+        start, count, top_ind, bottom_ind = compute_view(
+            total, self.selected, content_h
+        )
 
-        for i, entry in enumerate(rows):
-            y = 1 + i
-            if y >= height:
-                break
-            cursor, attr = (" ", self._attr("expression"))
-            if start + i == self.selected:
-                cursor = ">"
-                attr = self._attr("selection")
-            text = f"{cursor} {entry.expr} = {entry.result}"
+        cursor = self.glyphs.get("cursor", ">")
+        row = top
+        if top_ind:
+            draw_line(
+                self.win,
+                row,
+                left,
+                content_w,
+                overflow_text(self.glyphs, "up", start),
+                self._attr("hint"),
+            )
+            row += 1
+        for i in range(count):
+            idx = start + i
+            entry = self.history[idx]
+            if entry is None:
+                continue
+            cur, attr = (" ", self._attr("expression"))
+            if idx == self.selected:
+                cur, attr = cursor, self._attr("selection")
+            text = f"{cur} {entry.expr} = {entry.result}"
             if entry.notation:
                 text += f"  {entry.notation}"
-            max_len = max(width - 1, 0)
-            shown = text if len(text) <= max_len else f"{text[:max_len - 3]}..."
-            try:
-                self.win.addstr(y, 0, shown.ljust(max_len), attr)
-            except curses.error:
-                pass
+            draw_line(self.win, row, left, content_w, text, attr)
+            row += 1
+        if bottom_ind:
+            draw_line(
+                self.win,
+                row,
+                left,
+                content_w,
+                overflow_text(self.glyphs, "down", total - (start + count)),
+                self._attr("hint"),
+            )
         self.win.noutrefresh()
 
     # ----- selección -----

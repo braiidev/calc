@@ -129,6 +129,8 @@ UNICODE_GLYPHS: dict[str, str] = {
     "enter": "↵",
     "warn": "⚠",
     "root": "ⁿ√",
+    "up": "↑",
+    "down": "↓",
 }
 
 ASCII_GLYPHS: dict[str, str] = {
@@ -144,6 +146,8 @@ ASCII_GLYPHS: dict[str, str] = {
     "enter": "=",
     "warn": "!",
     "root": "root",
+    "up": "^",
+    "down": "v",
 }
 
 # ----- tonos de color -----
