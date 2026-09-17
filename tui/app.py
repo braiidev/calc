@@ -268,16 +268,17 @@ class App:
         p. ej. `5*` + traer resultado B -> `5*3`. Re-activar el mismo ítem sin
         editar nada entre medio no hace nada (evita que `<enter><space>` multiplique).
         """
-        entry = self.history_panel.selected_entry()
-        if entry is None:
+        current = self.history_panel.selected_entry()
+        if current is None:
             return
+        entry, idx = current
         if (
-            self._last_tray == ("history", entry[2])
+            self._last_tray == ("history", idx)
             and self._edit_counter == self._last_tray_edit
         ):
             return
-        self._tray_activate_value(entry[1])
-        self._last_tray = ("history", entry[2])
+        self._tray_activate_value(entry.result)
+        self._last_tray = ("history", idx)
         self._last_tray_edit = self._edit_counter
 
     def _vars_activate(self) -> None:
@@ -340,7 +341,7 @@ class App:
             try:
                 value = self.calc.evaluate(expr)
                 formatted = format_result(value)
-                self.history.add(expr, formatted)
+                self.history.add(expr, formatted, self.calc.notation(expr))
                 self.history_panel.reset_selection()
                 self.result_display = formatted
                 self.error = ""

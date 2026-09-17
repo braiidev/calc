@@ -81,6 +81,24 @@ def test_division_entera_por_cero(calc: Calculator) -> None:
         calc.evaluate("9 // 0")
 
 
+@pytest.mark.parametrize(
+    ("expr", "expected"),
+    [
+        ("9 // 4", "[floor]"),
+        ("sqrt(9)", "[sqrt]"),
+        ("root(8, 3)", "[cbrt]"),
+        ("root(16, 2)", "[sqrt]"),
+        ("root(32, 5)", "[nroot]"),
+        ("root(8, 3) + 9 // 4", "[cbrt] [floor]"),
+        ("9 // 4 + 8 // 3", "[floor]"),  # sin repetir
+        ("2 + 3", ""),  # básicas sin notación
+        ("2 +", ""),  # expresión inválida
+    ],
+)
+def test_notacion(calc: Calculator, expr: str, expected: str) -> None:
+    assert calc.notation(expr) == expected
+
+
 def test_variables_builtin(calc: Calculator) -> None:
     assert calc.evaluate("pi") == pytest.approx(3.141592653589793)
     assert calc.evaluate("e") == pytest.approx(2.718281828459045)

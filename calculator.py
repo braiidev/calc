@@ -435,6 +435,55 @@ def _sqrt(value: float) -> float:
     return math.sqrt(value)
 
 
+# ---------------- Notación semántica ----------------
+
+# Etiquetas de las operaciones "complejas" (las de símbolo no evidente).
+_TAG_FLOOR = "floor"
+_TAG_SQRT = "sqrt"
+_TAG_CBRT = "cbrt"
+_TAG_NROOT = "nroot"
+
+
+def _add_tag(tags: list[str], tag: str) -> None:
+    if tag not in tags:
+        tags.append(tag)
+
+
+def _call_tag(node: CallNode) -> Optional[str]:
+    """Etiqueta semántica de una función, o None si no es 'compleja'."""
+    if node.name == "sqrt":
+        return _TAG_SQRT
+    if node.name == "root":
+        index = node.args[1]
+        if isinstance(index, NumberNode) and index.value == int(index.value):
+            n = int(index.value)
+            if n == 2:
+                return _TAG_SQRT
+            if n == 3:
+                return _TAG_CBRT
+        return _TAG_NROOT
+    return None
+
+
+def _collect_tags(node: Node, tags: list[str]) -> None:
+    """Recorrer el AST agregando, sin repetir, las etiquetas de operaciones complejas."""
+    if isinstance(node, AssignNode):
+        _collect_tags(node.value, tags)
+    elif isinstance(node, UnaryOpNode):
+        _collect_tags(node.child, tags)
+    elif isinstance(node, CallNode):
+        for arg in node.args:
+            _collect_tags(arg, tags)
+        tag = _call_tag(node)
+        if tag is not None:
+            _add_tag(tags, tag)
+    elif isinstance(node, BinOpNode):
+        _collect_tags(node.left, tags)
+        _collect_tags(node.right, tags)
+        if node.op == "//":
+            _add_tag(tags, _TAG_FLOOR)
+
+
 # ---------------- API pública ----------------
 
 
@@ -459,3 +508,17 @@ class Calculator:
         parser = Parser(tokens)
         ast = parser.parse()
         return evaluate_ast(ast, self.variables)
+
+    def notation(self, expr: str) -> str:
+        """Etiquetas semánticas de las operaciones complejas, en orden de aparición.
+
+        Devuelve, p. ej., `[floor] [cbrt]`; o "" si no hay operaciones complejas
+        o la expresión no parsea.
+        """
+        try:
+            ast = Parser(tokenize(expr)).parse()
+        except CalcSyntaxError:
+            return ""
+        tags: list[str] = []
+        _collect_tags(ast, tags)
+        return " ".join(f"[{tag}]" for tag in tags)

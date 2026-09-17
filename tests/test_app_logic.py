@@ -17,7 +17,7 @@ class StubHistoryPanel:
         entry = self.history[idx]
         if entry is None:
             return None
-        return entry[0], entry[1], idx
+        return entry, idx
 
     def reset_selection(self) -> None:
         self.selected = -1
@@ -123,4 +123,17 @@ def test_eval_tolera_igual_tecleado() -> None:
         app._insert(char)
     app._handle_action("eval", "")
     assert app.result_display == "5"
-    assert app.history[0] == ("2+3", "5")
+    entry = app.history[0]
+    assert entry is not None
+    assert entry.expr == "2+3"
+    assert entry.result == "5"
+
+
+def test_historial_guarda_notacion() -> None:
+    app = make_app()
+    for char in "root(8,3)":
+        app._insert(char)
+    app._handle_action("eval", "")
+    entry = app.history[0]
+    assert entry is not None
+    assert entry.notation == "[cbrt]"

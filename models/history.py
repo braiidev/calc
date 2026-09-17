@@ -1,22 +1,34 @@
 """Historial session de operaciones evaluadas."""
 
 from collections import deque
+from dataclasses import dataclass
 from typing import Optional
 
 
-class History:
-    """Almacena las últimas operaciones evaluadas (expr, resultado).
+@dataclass(frozen=True)
+class HistoryEntry:
+    """Una operación evaluada: expresión cruda, resultado y notación semántica."""
 
-    El resultado se guarda como texto ya formateado, tal como se mostró.
+    expr: str
+    result: str
+    notation: str = ""
+
+
+class History:
+    """Almacena las últimas operaciones evaluadas.
+
+    El resultado se guarda como texto ya formateado, tal como se mostró, y la
+    notación como etiquetas semánticas de las operaciones complejas (p. ej.
+    `[floor]`).
     """
 
     def __init__(self, max_size: int = 20) -> None:
         self._max_size = max_size
-        self._entries: deque[tuple[str, str]] = deque(maxlen=max_size)
+        self._entries: deque[HistoryEntry] = deque(maxlen=max_size)
 
-    def add(self, expr: str, result: str) -> None:
-        """Agregar una operación (colas de la más reciente al final)."""
-        self._entries.append((expr, result))
+    def add(self, expr: str, result: str, notation: str = "") -> None:
+        """Agregar una operación (cola de la más reciente al final)."""
+        self._entries.append(HistoryEntry(expr, result, notation))
 
     def delete_at(self, index: int) -> bool:
         """Eliminar la entrada en `index`. Retorna True si existía."""
@@ -34,14 +46,14 @@ class History:
     def length(self) -> int:
         return len(self._entries)
 
-    def last(self, n: int = 10) -> list[tuple[str, str]]:
+    def last(self, n: int = 10) -> list[HistoryEntry]:
         """Retornar las últimas n entradas, la más reciente al final."""
         return list(self._entries)[-n:]
 
     def __len__(self) -> int:
         return len(self._entries)
 
-    def __getitem__(self, index: int) -> Optional[tuple[str, str]]:
+    def __getitem__(self, index: int) -> Optional[HistoryEntry]:
         if index < 0 or index >= len(self._entries):
             return None
         return self._entries[index]

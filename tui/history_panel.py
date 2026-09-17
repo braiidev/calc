@@ -2,6 +2,8 @@
 
 import curses
 
+from models.history import HistoryEntry
+
 
 class HistoryPanel:
     """Muestra el historial con una entrada seleccionada (cursor) y auto-scroll."""
@@ -40,7 +42,7 @@ class HistoryPanel:
             start = min(max(self.selected - visible // 2, 0), total - visible)
         rows = self.history.last(total)[start : start + visible]
 
-        for i, (expr, result) in enumerate(rows):
+        for i, entry in enumerate(rows):
             y = 1 + i
             if y >= height:
                 break
@@ -48,7 +50,9 @@ class HistoryPanel:
             if start + i == self.selected:
                 cursor = ">"
                 attr = curses.A_NORMAL
-            text = f"{cursor} {expr} = {result}"
+            text = f"{cursor} {entry.expr} = {entry.result}"
+            if entry.notation:
+                text += f"  {entry.notation}"
             max_len = max(width - 1, 0)
             shown = text if len(text) <= max_len else f"{text[:max_len - 3]}..."
             try:
@@ -76,24 +80,25 @@ class HistoryPanel:
         if len(self.history):
             self.selected = len(self.history) - 1
 
-    def selected_entry(self) -> tuple[str, str, int] | None:
-        """(expr, result, index) de la entrada seleccionada, o None."""
+    def selected_entry(self) -> tuple[HistoryEntry, int] | None:
+        """(entrada, index) de la seleccionada, o None."""
         if len(self.history) == 0:
             return None
         idx = self.selected if self.selected >= 0 else len(self.history) - 1
         entry = self.history[idx]
         if entry is None:
             return None
-        return entry[0], entry[1], idx
+        return entry, idx
 
     def delete_selected(self) -> bool:
         """Eliminar la entrada seleccionada. Retorna True si se borró."""
         current = self.selected_entry()
         if current is None:
             return False
-        ok = self.history.delete_at(current[2])
+        idx = current[1]
+        ok = self.history.delete_at(idx)
         if ok and len(self.history):
-            self.selected = min(max(current[2] - 1, 0), len(self.history) - 1)
+            self.selected = min(max(idx - 1, 0), len(self.history) - 1)
         else:
             self.selected = -1
         return ok
