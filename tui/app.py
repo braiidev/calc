@@ -4,7 +4,7 @@ import curses
 
 from calculator import Calculator, CalcSyntaxError, CalcMathError
 from tui.display import Display
-from tui.keyboard import Keyboard, PAIR_NUM, PAIR_OP, PAIR_ACTION, PAIR_FOCUS
+from tui.keyboard import Keyboard, PAIR_NUM, PAIR_OP, PAIR_ACTION
 
 # Código de tecla: backspace puede venir como 127 o 8
 KEY_BACKSPACE = (curses.KEY_BACKSPACE, 127, 8, curses.KEY_DC)
@@ -45,7 +45,6 @@ class App:
         curses.init_pair(PAIR_NUM, curses.COLOR_WHITE, -1)
         curses.init_pair(PAIR_OP, curses.COLOR_CYAN, -1)
         curses.init_pair(PAIR_ACTION, curses.COLOR_YELLOW, -1)
-        curses.init_pair(PAIR_FOCUS, curses.COLOR_BLACK, curses.COLOR_WHITE)
 
     def _make_windows(self) -> None:
         height, width = self.stdscr.getmaxyx()
@@ -80,6 +79,7 @@ class App:
                 self.result_display = ""
         self.display.render(self.expression, self.result_display, self.error)
         self.keyboard.render(highlight=self.expression[-1] if self.expression else None)
+        self.stdscr.refresh()
 
     # ----- input -----
 

@@ -8,7 +8,6 @@ from typing import Optional
 PAIR_NUM = 1
 PAIR_OP = 2
 PAIR_ACTION = 3
-PAIR_FOCUS = 4
 
 _ACTIONS = ("insert", "clear", "back", "eval")
 
@@ -40,6 +39,7 @@ class Keyboard:
         self.win = window
         self.row = 0
         self.col = 0
+        self.use_colors = curses.has_colors()
 
     def render(self, highlight: Optional[str] = None) -> None:
         height, width = self.win.getmaxyx()
@@ -59,25 +59,29 @@ class Keyboard:
             x = x_offset
             for c, key in enumerate(row):
                 focused = (r == self.row and c == self.col)
-                pair = self._pair_for(key, focused, highlight)
+                attrs = self._attrs_for(key, focused, highlight)
                 try:
-                    self.win.addstr(y, x, f"[{key.label}]".ljust(button_w), pair)
+                    self.win.addstr(y, x, f"[{key.label}]".ljust(button_w), attrs)
                 except curses.error:
                     pass
                 x += button_w
         self.win.refresh()
 
-    @staticmethod
-    def _pair_for(key: KeyDef, focused: bool, highlight: Optional[str] = None) -> int:
-        if focused:
-            return PAIR_FOCUS
-        if highlight is not None and key.label == highlight:
-            return PAIR_FOCUS
-        if key.action == "insert":
-            if key.label.isdigit() or key.label == ".":
-                return PAIR_NUM
-            return PAIR_OP
-        return PAIR_ACTION
+    def _attrs_for(self, key: KeyDef, focused: bool, highlight: Optional[str] = None) -> int:
+        """Atributos del botón: A_REVERSE + color (A_REVERSE funciona sin soporte de color)."""
+        attrs = 0
+        if focused or (highlight is not None and key.label == highlight):
+            attrs |= curses.A_REVERSE
+        if self.use_colors:
+            if key.action == "insert":
+                if key.label.isdigit() or key.label == ".":
+                    pair = PAIR_NUM
+                else:
+                    pair = PAIR_OP
+            else:
+                pair = PAIR_ACTION
+            attrs |= curses.color_pair(pair)
+        return attrs
 
     # ----- navegación -----
 
