@@ -9,7 +9,7 @@ PAIR_NUM = 1
 PAIR_OP = 2
 PAIR_ACTION = 3
 
-_ACTIONS = ("insert", "clear", "back", "eval")
+_ACTIONS = ("insert", "clear", "back", "eval", "ans")
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,7 @@ class KeyDef:
 
 
 _KEYS = [
+    [KeyDef("√", char="sqrt("), KeyDef("**"), KeyDef("%"), KeyDef("!"), KeyDef("ANS", "ans")],
     [KeyDef("7"), KeyDef("8"), KeyDef("9"), KeyDef("C", "clear"), KeyDef("DEL", "back")],
     [KeyDef("4"), KeyDef("5"), KeyDef("6"), KeyDef("+"), KeyDef("-")],
     [KeyDef("1"), KeyDef("2"), KeyDef("3"), KeyDef("*"), KeyDef("/")],
@@ -48,7 +49,7 @@ class Keyboard:
             return
 
         # Centrar el grid horizontalmente
-        button_w = 3
+        button_w = 5
         grid_w = len(_KEYS[0]) * button_w
         x_offset = max((width - grid_w) // 2, 0)
 
@@ -61,7 +62,7 @@ class Keyboard:
                 focused = (r == self.row and c == self.col)
                 attrs = self._attrs_for(key, focused, highlight)
                 try:
-                    self.win.addstr(y, x, f"[{key.label}]".ljust(button_w), attrs)
+                    self.win.addstr(y, x, f"[{key.label}]".center(button_w), attrs)
                 except curses.error:
                     pass
                 x += button_w

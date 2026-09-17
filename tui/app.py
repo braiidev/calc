@@ -115,13 +115,13 @@ class App:
             return  # tecla sin mapear
 
         char = chr(ch)
-        if char in "0123456789.+-*/()":
+        if char in "0123456789.+-*/()%!":
             self._insert(char)
 
     def _insert(self, char: str) -> None:
         self.error = ""
         if self.just_evaluated:
-            self.expression = self.result_display + char if char in "+-*/" else char
+            self.expression = self.result_display + char if char in "+-*/%!" else char
             self.just_evaluated = False
             return
         self.expression += char
@@ -147,3 +147,8 @@ class App:
                 self.just_evaluated = True
             except (CalcSyntaxError, CalcMathError, ValueError) as exc:
                 self.error = str(exc)
+        elif action == "ans":
+            if self.result_display:
+                self.expression = self.result_display
+                self.just_evaluated = False
+                self.error = ""

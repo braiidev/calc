@@ -1,8 +1,11 @@
 """Lexer, parser y evaluator de expresiones matemáticas.
 
-Fase 1 (v0.1): soporta números decimales y operaciones + - * / ( ).
+Operadores soportados:
+- Aritmética básica: + - * / ( )
+- Científica (v0.2): ** (potencia), % (módulo), ! (factorial), sqrt()
 """
 
+import math
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
@@ -14,6 +17,10 @@ class TokType(Enum):
     MINUS = auto()
     MULT = auto()
     DIV = auto()
+    MOD = auto()
+    POW = auto()
+    FACT = auto()
+    IDENT = auto()
     LPAREN = auto()
     RPAREN = auto()
     EOF = auto()
@@ -31,7 +38,7 @@ class CalcSyntaxError(ValueError):
 
 
 class CalcMathError(ValueError):
-    """Error matemático (división por cero, etc.)."""
+    """Error matemático (división por cero, factorial inválido, etc.)."""
 
 
 # ---------------- AST ----------------
@@ -54,21 +61,23 @@ class BinOpNode(Node):
 
 @dataclass
 class UnaryOpNode(Node):
-    op: str
+    op: str  # '-', '!', 'sqrt'
     child: Node
 
 
-_TOKEN_MAP: dict[str, TokType] = {
+# ---------------- Lexer ----------------
+
+_SINGLE_CHAR: dict[str, TokType] = {
     "+": TokType.PLUS,
     "-": TokType.MINUS,
     "*": TokType.MULT,
     "/": TokType.DIV,
+    "%": TokType.MOD,
+    "!": TokType.FACT,
     "(": TokType.LPAREN,
     ")": TokType.RPAREN,
 }
 
-
-# ---------------- Lexer ----------------
 
 def tokenize(expr: str) -> list[Token]:
     """Convertir una expresión en una lista de tokens."""
@@ -92,7 +101,19 @@ def tokenize(expr: str) -> list[Token]:
             tokens.append(Token(TokType.NUMBER, value=value, lexeme=lexeme))
             i = j
             continue
-        ttype = _TOKEN_MAP.get(ch)
+        if ch == "*" and i + 1 < n and expr[i + 1] == "*":
+            tokens.append(Token(TokType.POW, lexeme="**"))
+            i += 2
+            continue
+        if ch.isalpha() or ch == "_":
+            j = i
+            while j < n and (expr[j].isalnum() or expr[j] == "_"):
+                j += 1
+            name = expr[i:j]
+            tokens.append(Token(TokType.IDENT, lexeme=name))
+            i = j
+            continue
+        ttype = _SINGLE_CHAR.get(ch)
         if ttype is None:
             raise CalcSyntaxError(f"Carácter no reconocido: '{ch}'")
         tokens.append(Token(ttype, lexeme=ch))
@@ -103,19 +124,25 @@ def tokenize(expr: str) -> list[Token]:
 
 # ---------------- Parser ----------------
 
-class Parser:
-    """Parser por descenso recursivo con gramática de precedencia:
+# Funciones con notación de llamada: sqrt(x)
+_FUNCTIONS = {"sqrt"}
 
-    expr   := term (('+' | '-') term)*
-    term   := factor (('*' | '/') factor)*
-    factor := '-' factor | NUMBER | '(' expr ')'
+
+class Parser:
+    """Parser por descenso recursivo. Precedencia (de menor a mayor):
+
+    expr    := term (('+' | '-') term)*
+    term    := unary (('*' | '/' | '%') unary)*
+    unary   := '-' unary | power
+    power   := postfix ('**' unary)?            # asociativa a la derecha
+    postfix := primary ('!')*
+    primary := NUMBER | '(' expr ')' | IDENT '(' expr ')'
     """
 
-    _BIN_OPS: dict[TokType, str] = {
-        TokType.PLUS: "+",
-        TokType.MINUS: "-",
+    _TERM_OPS = {
         TokType.MULT: "*",
         TokType.DIV: "/",
+        TokType.MOD: "%",
     }
 
     def __init__(self, tokens: list[Token]) -> None:
@@ -148,8 +175,7 @@ class Parser:
     def _expect(self, ttype: TokType) -> Token:
         token = self._match(ttype)
         if token is None:
-            expected = _LABELS.get(ttype, ttype.name)
-            raise CalcSyntaxError(f"Se esperaba '{expected}'")
+            raise CalcSyntaxError(f"Se esperaba '{_LABELS[ttype]}'")
         return token
 
     # ------- reglas -------
@@ -159,25 +185,49 @@ class Parser:
         while (op := self._current().type) in (TokType.PLUS, TokType.MINUS):
             self._advance()
             right = self._parse_term()
-            node = BinOpNode(node, self._BIN_OPS[op], right)
+            node = BinOpNode(node, "+" if op == TokType.PLUS else "-", right)
         return node
 
     def _parse_term(self) -> Node:
-        node = self._parse_factor()
-        while (op := self._current().type) in (TokType.MULT, TokType.DIV):
+        node = self._parse_unary()
+        while (op := self._current().type) in self._TERM_OPS:
             self._advance()
-            right = self._parse_factor()
-            node = BinOpNode(node, self._BIN_OPS[op], right)
+            right = self._parse_unary()
+            node = BinOpNode(node, self._TERM_OPS[op], right)
         return node
 
-    def _parse_factor(self) -> Node:
+    def _parse_unary(self) -> Node:
+        if self._match(TokType.MINUS):
+            return UnaryOpNode("-", self._parse_unary())
+        return self._parse_power()
+
+    def _parse_power(self) -> Node:
+        node = self._parse_postfix()
+        if self._match(TokType.POW):
+            # right = unary -> asociativa derecha y admite exponente negativo
+            right = self._parse_unary()
+            node = BinOpNode(node, "**", right)
+        return node
+
+    def _parse_postfix(self) -> Node:
+        node = self._parse_primary()
+        while self._match(TokType.FACT):
+            node = UnaryOpNode("!", node)
+        return node
+
+    def _parse_primary(self) -> Node:
         token = self._current()
         if token.type == TokType.NUMBER:
             self._advance()
             return NumberNode(token.value)
-        if token.type == TokType.MINUS:
+        if token.type == TokType.IDENT:
             self._advance()
-            return UnaryOpNode("-", self._parse_factor())
+            if token.lexeme not in _FUNCTIONS:
+                raise CalcSyntaxError(f"Función desconocida: '{token.lexeme}'")
+            self._expect(TokType.LPAREN)
+            arg = self._parse_expr()
+            self._expect(TokType.RPAREN)
+            return UnaryOpNode(token.lexeme, arg)
         if token.type == TokType.LPAREN:
             self._advance()
             node = self._parse_expr()
@@ -196,6 +246,9 @@ _LABELS: dict[TokType, str] = {
 
 # ---------------- Evaluator ----------------
 
+_FACTORIAL_MAX = 1000
+
+
 def evaluate_ast(node: Node) -> float:
     """Evaluar el árbol sintáctico abstracto."""
     if isinstance(node, NumberNode):
@@ -204,7 +257,11 @@ def evaluate_ast(node: Node) -> float:
         value = evaluate_ast(node.child)
         if node.op == "-":
             return -value
-        raise CalcMathError(f"Operador unario desconocido: '{node.op}'")
+        if node.op == "!":
+            return _factorial(value)
+        if node.op == "sqrt":
+            return _sqrt(value)
+        raise CalcMathError(f"Operador desconocido: '{node.op}'")
     if isinstance(node, BinOpNode):
         left = evaluate_ast(node.left)
         right = evaluate_ast(node.right)
@@ -223,7 +280,33 @@ def _apply_binop(op: str, left: float, right: float) -> float:
         if right == 0:
             raise CalcMathError("División por cero")
         return left / right
+    if op == "%":
+        if right == 0:
+            raise CalcMathError("División por cero")
+        return left % right
+    if op == "**":
+        try:
+            return left ** right
+        except (OverflowError, ValueError):
+            raise CalcMathError("Resultado fuera de rango")
     raise CalcSyntaxError(f"Operador no soportado: '{op}'")
+
+
+def _factorial(value: float) -> float:
+    if value != int(value):
+        raise CalcMathError("El factorial requiere un entero")
+    n = int(value)
+    if n < 0:
+        raise CalcMathError("Factorial de número negativo")
+    if n > _FACTORIAL_MAX:
+        raise CalcMathError(f"Factorial demasiado grande (máx {_FACTORIAL_MAX})")
+    return float(math.factorial(n))
+
+
+def _sqrt(value: float) -> float:
+    if value < 0:
+        raise CalcMathError("Raíz de número negativo")
+    return math.sqrt(value)
 
 
 # ---------------- API pública ----------------
@@ -234,6 +317,7 @@ class Calculator:
     Uso:
         calc = Calculator()
         result = calc.evaluate("2 + 3 * 4")  # 14.0
+        result = calc.evaluate("2 ** 3 !")   # 64.0
     """
 
     def __init__(self) -> None:
