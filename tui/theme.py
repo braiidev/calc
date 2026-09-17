@@ -131,6 +131,12 @@ UNICODE_GLYPHS: dict[str, str] = {
     "root": "ⁿ√",
     "up": "↑",
     "down": "↓",
+    "sqrt": "√",
+    "nroot": "ⁿ√",
+    "pow": "xʸ",
+    "times": "×",
+    "divide": "÷",
+    "minus": "−",
 }
 
 ASCII_GLYPHS: dict[str, str] = {
@@ -148,6 +154,12 @@ ASCII_GLYPHS: dict[str, str] = {
     "root": "root",
     "up": "^",
     "down": "v",
+    "sqrt": "sqr",
+    "nroot": "nrt",
+    "pow": "**",
+    "times": "*",
+    "divide": "/",
+    "minus": "-",
 }
 
 # ----- tonos de color -----

@@ -27,7 +27,7 @@ SPACE = 32
 OPERATOR_LITERALS = "+-*/()%!,="
 
 DISPLAY_H = 4
-KEYBOARD_H = 5
+KEYBOARD_H = 6
 MIN_ROWS = DISPLAY_H + KEYBOARD_H + 2  # mínimo: display + historial + teclado
 MIN_COLS = 30  # ancho mínimo del grid del teclado (6 * 5)
 
@@ -146,7 +146,7 @@ class App:
             bordered,
         )
         self.help_panel = HelpPanel(self.help_win, self.attrs)
-        self.keyboard = Keyboard(self.keyboard_win, self.attrs)
+        self.keyboard = Keyboard(self.keyboard_win, self.attrs, glyphs)
 
     # ----- loop principal -----
 
