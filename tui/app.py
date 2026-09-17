@@ -13,7 +13,7 @@ KEY_BACKSPACE = (curses.KEY_BACKSPACE, 127, 8, curses.KEY_DC)
 KEY_ENTER = (10, 13, curses.KEY_ENTER)
 TAB = 9
 SPACE = 32
-INSERTABLE = "0123456789.+-*/()%!"
+INSERTABLE = "0123456789.+-*/()%!:"
 
 DISPLAY_H = 4
 KEYBOARD_H = 5
@@ -101,7 +101,10 @@ class App:
         hint = H_HINT if self.focus == "history" else K_HINT
         self.display.render(self.expression, self.result_display, message, hint)
         self.history_panel.render()
-        self.keyboard.render(highlight=self.expression[-1] if self.expression else None)
+        last = self.expression[-1] if self.expression else None
+        suffix = self.expression[-2:] if len(self.expression) >= 2 else ""
+        highlight = suffix if suffix in ("**", "//") else last
+        self.keyboard.render(highlight=highlight)
         self.stdscr.refresh()
 
     # ----- entrada -----
@@ -235,7 +238,7 @@ class App:
     def _insert(self, char: str) -> None:
         self.error = ""
         if self.just_evaluated:
-            self.expression = self.result_display + char if char in "+-*/%!" else char
+            self.expression = self.result_display + char if char in "+-*/%!.:" else char
             self.just_evaluated = False
         else:
             self.expression += char

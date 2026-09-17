@@ -1,8 +1,10 @@
 """Lexer, parser y evaluator de expresiones matemáticas.
 
 Operadores soportados:
-- Aritmética básica: + - * / // ( )
-- Científica (v0.2): ** (potencia), % (módulo), ! (factorial), sqrt()
+- Aritmética básica: + - * / ( )
+- División entera: `:` (5:2 = 2)
+- Científica: ** (potencia), // (raíz n-ésima: 8//3 = 2), % (módulo),
+  ! (factorial), sqrt() (raíz cuadrada)
 """
 
 import math
@@ -18,6 +20,7 @@ class TokType(Enum):
     MULT = auto()
     DIV = auto()
     FLDIV = auto()
+    ROOT = auto()
     MOD = auto()
     POW = auto()
     FACT = auto()
@@ -43,6 +46,7 @@ class CalcMathError(ValueError):
 
 
 # ---------------- AST ----------------
+
 
 class Node:
     """Nodo base del árbol sintáctico."""
@@ -73,6 +77,7 @@ _SINGLE_CHAR: dict[str, TokType] = {
     "-": TokType.MINUS,
     "*": TokType.MULT,
     "/": TokType.DIV,
+    ":": TokType.FLDIV,
     "%": TokType.MOD,
     "!": TokType.FACT,
     "(": TokType.LPAREN,
@@ -107,7 +112,7 @@ def tokenize(expr: str) -> list[Token]:
             i += 2
             continue
         if ch == "/" and i + 1 < n and expr[i + 1] == "/":
-            tokens.append(Token(TokType.FLDIV, lexeme="//"))
+            tokens.append(Token(TokType.ROOT, lexeme="//"))
             i += 2
             continue
         if ch.isalpha() or ch == "_":
@@ -137,7 +142,7 @@ class Parser:
     """Parser por descenso recursivo. Precedencia (de menor a mayor):
 
     expr    := term (('+' | '-') term)*
-    term    := unary (('*' | '/' | '//' | '%') unary)*
+    term    := unary (('*' | '/' | ':' | '//' | '%') unary)*
     unary   := '-' unary | power
     power   := postfix ('**' unary)?            # asociativa a la derecha
     postfix := primary ('!')*
@@ -147,7 +152,8 @@ class Parser:
     _TERM_OPS = {
         TokType.MULT: "*",
         TokType.DIV: "/",
-        TokType.FLDIV: "//",
+        TokType.FLDIV: ":",
+        TokType.ROOT: "//",
         TokType.MOD: "%",
     }
 
@@ -225,6 +231,8 @@ class Parser:
         token = self._current()
         if token.type == TokType.NUMBER:
             self._advance()
+            if token.value is None:
+                raise CalcSyntaxError(f"Número mal formado: '{token.lexeme}'")
             return NumberNode(token.value)
         if token.type == TokType.IDENT:
             self._advance()
@@ -250,7 +258,8 @@ _LABELS: dict[TokType, str] = {
     TokType.MINUS: "-",
     TokType.MULT: "*",
     TokType.DIV: "/",
-    TokType.FLDIV: "//",
+    TokType.FLDIV: ":",
+    TokType.ROOT: "//",
     TokType.MOD: "%",
     TokType.POW: "**",
     TokType.FACT: "!",
@@ -296,20 +305,42 @@ def _apply_binop(op: str, left: float, right: float) -> float:
         if right == 0:
             raise CalcMathError("División por cero")
         return left / right
-    if op == "//":
+    if op == ":":
         if right == 0:
             raise CalcMathError("División por cero")
-        return left // right
+        if left != int(left) or right != int(right):
+            raise CalcMathError("La división entera requiere enteros")
+        return float(int(left) // int(right))
+    if op == "//":
+        return _root(left, right)
     if op == "%":
         if right == 0:
             raise CalcMathError("División por cero")
         return left % right
     if op == "**":
         try:
-            return left ** right
+            return left**right
         except (OverflowError, ValueError):
             raise CalcMathError("Resultado fuera de rango")
     raise CalcSyntaxError(f"Operador no soportado: '{op}'")
+
+
+def _root(base: float, index: float) -> float:
+    """Raíz n-ésima: base // index == base ** (1/index). `8//3 = 2`."""
+    if index == 0:
+        raise CalcMathError("Índice de raíz cero")
+    negative = base < 0
+    if base < 0:
+        if index != int(index):
+            raise CalcMathError("Raíz de número negativo con índice fraccionario")
+        if int(index) % 2 == 0:
+            raise CalcMathError("Raíz de índice par sobre número negativo")
+        base = -base
+    try:
+        result = base ** (1.0 / index)
+    except (OverflowError, ValueError):
+        raise CalcMathError("Resultado fuera de rango")
+    return -result if negative else result
 
 
 def _factorial(value: float) -> float:
@@ -331,13 +362,16 @@ def _sqrt(value: float) -> float:
 
 # ---------------- API pública ----------------
 
+
 class Calculator:
     """Calculadora con parser propio.
 
     Uso:
         calc = Calculator()
-        result = calc.evaluate("2 + 3 * 4")  # 14.0
-        result = calc.evaluate("2 ** 3 !")   # 64.0
+        result = calc.evaluate("2 + 3 * 4")    # 14.0
+        result = calc.evaluate("2 ** 3 !")     # 64.0
+        result = calc.evaluate("8//3")         # 2.0  (raíz cúbica)
+        result = calc.evaluate("5:2")          # 2.0  (división entera)
     """
 
     def __init__(self) -> None:

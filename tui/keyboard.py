@@ -10,6 +10,7 @@ PAIR_OP = 2
 PAIR_ACTION = 3
 
 _ACTIONS = ("insert", "clear", "back", "eval", "ans")
+_GRID_COLS = 6
 
 
 @dataclass(frozen=True)
@@ -20,11 +21,25 @@ class KeyDef:
 
 
 _KEYS = [
-    [KeyDef("√", char="sqrt("), KeyDef("**"), KeyDef("%"), KeyDef("!"), KeyDef("ANS", "ans")],
-    [KeyDef("7"), KeyDef("8"), KeyDef("9"), KeyDef("C", "clear"), KeyDef("DEL", "back")],
-    [KeyDef("4"), KeyDef("5"), KeyDef("6"), KeyDef("+"), KeyDef("-")],
-    [KeyDef("1"), KeyDef("2"), KeyDef("3"), KeyDef("*"), KeyDef("/")],
-    [KeyDef("0"), KeyDef("."), KeyDef("("), KeyDef(")"), KeyDef("=", "eval")],
+    [
+        KeyDef("√", char="sqrt("),
+        KeyDef("**"),
+        KeyDef("//"),
+        KeyDef(":"),
+        KeyDef("%"),
+        KeyDef("!"),
+    ],
+    [
+        KeyDef("ANS", "ans"),
+        KeyDef("7"),
+        KeyDef("8"),
+        KeyDef("9"),
+        KeyDef("C", "clear"),
+        KeyDef("DEL", "back"),
+    ],
+    [KeyDef("("), KeyDef("4"), KeyDef("5"), KeyDef("6"), KeyDef("+"), KeyDef("-")],
+    [KeyDef(")"), KeyDef("1"), KeyDef("2"), KeyDef("3"), KeyDef("*"), KeyDef("/")],
+    [KeyDef("0"), KeyDef("."), KeyDef("=", "eval")],
 ]
 _BUTTON_IDS: dict[str, tuple[int, int]] = {}
 for _row in range(len(_KEYS)):
@@ -50,7 +65,7 @@ class Keyboard:
 
         # Centrar el grid horizontalmente
         button_w = 5
-        grid_w = len(_KEYS[0]) * button_w
+        grid_w = _GRID_COLS * button_w
         x_offset = max((width - grid_w) // 2, 0)
 
         for r, row in enumerate(_KEYS):
@@ -59,7 +74,7 @@ class Keyboard:
                 break
             x = x_offset
             for c, key in enumerate(row):
-                focused = (r == self.row and c == self.col)
+                focused = r == self.row and c == self.col
                 attrs = self._attrs_for(key, focused, highlight)
                 try:
                     self.win.addstr(y, x, f"[{key.label}]".center(button_w), attrs)
@@ -68,7 +83,9 @@ class Keyboard:
                 x += button_w
         self.win.refresh()
 
-    def _attrs_for(self, key: KeyDef, focused: bool, highlight: Optional[str] = None) -> int:
+    def _attrs_for(
+        self, key: KeyDef, focused: bool, highlight: Optional[str] = None
+    ) -> int:
         """Atributos del botón: A_REVERSE + color (A_REVERSE funciona sin soporte de color)."""
         attrs = 0
         if focused or (highlight is not None and key.label == highlight):
@@ -87,16 +104,18 @@ class Keyboard:
     # ----- navegación -----
 
     def move(self, dr: int, dc: int) -> None:
-        rows, cols = len(_KEYS), len(_KEYS[0])
+        rows = len(_KEYS)
+        cols = len(_KEYS[self.row])
         self.row = max(0, min(rows - 1, self.row + dr))
         self.col = max(0, min(cols - 1, self.col + dc))
 
     def focused_action(self) -> tuple[str, str]:
         """Retornar (action, char). Si no hay char, usamos el label."""
-        key = _KEYS[self.row][self.col]
+        row = _KEYS[self.row]
+        key = row[min(self.col, len(row) - 1)]
         return key.action, key.char if key.char is not None else key.label
 
-    def find_char(self, ch: str) -> Optional[int]:
+    def find_char(self, ch: str) -> Optional[tuple[int, int]]:
         """Resaltar botón cuyo label coincida con la tecla pulsada."""
         if ch not in _BUTTON_IDS:
             return None
