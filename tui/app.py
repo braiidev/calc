@@ -192,28 +192,42 @@ class App:
         self.stdscr.noutrefresh()
         curses.doupdate()
 
+    _MODE_LABEL = {"keyboard": "teclado", "history": "historial", "vars": "variables"}
+    _NEXT_FOCUS = {"keyboard": "historial", "history": "variables", "vars": "teclado"}
+
     def _status_text(self) -> str:
-        """Barra de estado contextual según el foco (o hints fijos si está off)."""
+        """Barra: `<modo> · <acción bajo cursor> · tab <destino> · ? ayuda · q salir`."""
         prompt = self.theme.glyphs.get("prompt", ">")
         if self.show_help:
             return f"{prompt} ayuda · ? o esc cerrar · q salir"
         if not self.theme.status_bar:
             return {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
         if self.focus == "keyboard":
-            text = f"{prompt} teclado · ←↑↓→ mover · enter pulsar"
             desc = self.keyboard.focused_description()
-            if desc:
-                text += f" «{desc}»"
-            return text + " · tab historial · T tema · ? ayuda"
-        if self.focus == "history":
-            return (
-                f"{prompt} historial · j/k mover · enter traer · d borrar · "
-                "x limpiar · tab variables"
-            )
-        return (
-            f"{prompt} variables · j/k mover · enter traer · d borrar · "
-            "x limpiar · tab teclado"
-        )
+            item = f"«{desc}»" if desc else "—"
+        elif self.focus == "history":
+            item = self._history_item()
+        else:
+            item = self._vars_item()
+        mode = self._MODE_LABEL[self.focus]
+        nxt = self._NEXT_FOCUS[self.focus]
+        return f"{prompt} {mode} · {item} · tab {nxt} · ? ayuda · q salir"
+
+    def _history_item(self) -> str:
+        """Entrada seleccionada del historial como texto `expr = result`."""
+        current = self.history_panel.selected_entry()
+        if current is None:
+            return "—"
+        entry, _ = current
+        return f"{entry.expr} = {entry.result}"
+
+    def _vars_item(self) -> str:
+        """Variable seleccionada como texto `nombre = valor`."""
+        var = self.vars_panel.selected_var()
+        if var is None:
+            return "—"
+        name, value = var
+        return f"{name} = {format_result(value)}"
 
     # ----- entrada -----
 

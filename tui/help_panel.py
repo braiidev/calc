@@ -16,7 +16,7 @@ _HELP_LINES = [
     "",
     "TECLAS",
     "  tab foco · enter/space evaluar o traer valor",
-    "  esc/D limpiar · c borrar · d borrar ítem · T tema · ? ayuda · q salir",
+    "  esc/D limpiar · c borrar · d borrar ítem · T color · ? ayuda · q salir",
 ]
 
 

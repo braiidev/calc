@@ -111,17 +111,39 @@ def test_status_text_keyboard() -> None:
     app.keyboard = KB()  # type: ignore[assignment]
     text = app._status_text()
     assert "teclado" in text
-    assert "sumar" in text
+    assert "«sumar»" in text
     assert "tab historial" in text
+    assert "? ayuda" in text
+    assert "q salir" in text
 
 
-def test_status_text_otros_focos() -> None:
+def test_status_text_historial_muestra_entrada() -> None:
+    app = make_app()
+    app.theme = resolve_theme({"theme": "frio"}, 24, False)
+    app.history.add("9 // 4", "2", "[floor]")
+    app.focus = "history"
+    text = app._status_text()
+    assert "historial" in text
+    assert "9 // 4 = 2" in text
+    assert "tab variables" in text
+
+
+def test_status_text_vars_muestra_variable() -> None:
+    app = make_app()
+    app.theme = resolve_theme({"theme": "frio"}, 24, False)
+    app.calc.evaluate("x = 5")
+    app.focus = "vars"
+    text = app._status_text()
+    assert "variables" in text
+    assert "x = 5" in text
+    assert "tab teclado" in text
+
+
+def test_status_text_vacio_y_ayuda() -> None:
     app = make_app()
     app.theme = resolve_theme({"theme": "frio"}, 24, False)
     app.focus = "history"
-    assert "historial" in app._status_text()
-    app.focus = "vars"
-    assert "variables" in app._status_text()
+    assert "—" in app._status_text()
     app.show_help = True
     assert "ayuda" in app._status_text()
 
