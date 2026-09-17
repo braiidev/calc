@@ -102,7 +102,7 @@ def test_vars_activate_no_duplica() -> None:
 
 def test_status_text_keyboard() -> None:
     app = make_app()
-    app.theme = resolve_theme({"theme": "auto"}, 24, False)
+    app.theme = resolve_theme({"theme": "frio"}, 24, False)
 
     class KB:
         def focused_description(self):
@@ -117,7 +117,7 @@ def test_status_text_keyboard() -> None:
 
 def test_status_text_otros_focos() -> None:
     app = make_app()
-    app.theme = resolve_theme({"theme": "auto"}, 24, False)
+    app.theme = resolve_theme({"theme": "frio"}, 24, False)
     app.focus = "history"
     assert "historial" in app._status_text()
     app.focus = "vars"

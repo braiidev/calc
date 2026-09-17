@@ -1,13 +1,16 @@
 # TODO
 
 ## Doing
-- [ ] v0.6.3 - fix: arranque en negro y resize (bucle KEY_RESIZE + tamaños chicos)
+- [ ] v0.6.4 - Tema: T cicla solo color (mono/calido/frio/contraste), bordes automáticos por tamaño
 
 ## Next
-- [ ] v0.6.4 - Paneles: títulos, alineación de valores, cursor y estados vacíos
-- [ ] v0.6.5 - Teclado: glifos, colores y descripción de tecla enfocada
+- [ ] v0.6.5 - Barra de estado: `<Modo> · «acción bajo cursor» · tab <destino> · ? · q`
+- [ ] v0.6.6 - Layout adaptativo del medio (D/E/F) + scroll/overflow por panel + divisiones y títulos
+- [ ] v0.6.7 - Teclado Mockup B (bloques separados) + glifos Unicode con fallback
+- [ ] v0.6.8 - Cierre de fase: bump de VERSION y prueba de install.sh
 
 ## Done
+- [x] v0.6.3 - fix: arranque en negro y resize (bucle KEY_RESIZE + tamaños chicos)
 - [x] v0.6.2 - Display: barra de estado contextual + live notation
 - [x] v0.6.1 - theme.py + config.json + tecla T (ciclar temas) y colores por rol
 - [x] v0.5.3 - Leyenda toggleable de operadores/teclas con `?`

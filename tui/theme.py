@@ -51,57 +51,63 @@ _MODS: dict[str, int] = {
 }
 
 # Especificación de cada rol: "color+modificador+..." (color opcional).
-DEFAULT_COLORS: dict[str, str] = {
-    "expression": "white+bold",
-    "result": "green+bold",
-    "error": "red+bold",
-    "number": "white",
-    "operator": "cyan",
-    "action": "yellow",
-    "title": "cyan+bold",
+# Tonos de color disponibles (T cicla entre ellos). El estilo de bordes NO se
+# elige acá: se deriva del alto de la terminal en `resolve_theme`.
+
+# Monocromo: sin color, sólo atributos.
+MONO_COLORS: dict[str, str] = {
+    "expression": "default",
+    "result": "bold",
+    "error": "reverse",
+    "number": "default",
+    "operator": "default",
+    "action": "dim",
+    "title": "bold",
     "title_dim": "dim",
     "selection": "reverse",
     "hint": "dim",
     "separator": "dim",
 }
 
-AMBER_COLORS: dict[str, str] = {
+# Cálido: rojos/amarillos/magenta.
+WARM_COLORS: dict[str, str] = {
     "expression": "yellow+bold",
-    "result": "green+bold",
+    "result": "yellow+bold",
     "error": "red+bold",
-    "number": "yellow",
-    "operator": "yellow",
-    "action": "yellow",
-    "title": "yellow+reverse",
+    "number": "white",
+    "operator": "red",
+    "action": "magenta",
+    "title": "yellow+bold",
     "title_dim": "yellow+dim",
-    "selection": "reverse",
+    "selection": "reverse+yellow",
     "hint": "yellow+dim",
     "separator": "yellow+dim",
 }
 
-NEON_COLORS: dict[str, str] = {
-    "expression": "white+bold",
-    "result": "magenta+bold",
+# Frío: cian/azul/verde (paleta base).
+COOL_COLORS: dict[str, str] = {
+    "expression": "cyan+bold",
+    "result": "green+bold",
     "error": "red+bold",
     "number": "white",
     "operator": "cyan",
-    "action": "magenta",
-    "title": "magenta+bold",
-    "title_dim": "dim",
-    "selection": "reverse",
+    "action": "blue",
+    "title": "cyan+bold",
+    "title_dim": "cyan+dim",
+    "selection": "reverse+cyan",
     "hint": "cyan+dim",
     "separator": "cyan+dim",
 }
 
-# Sin color: sólo atributos.
-MONO_COLORS: dict[str, str] = {
-    "expression": "bold",
-    "result": "bold",
-    "error": "bold",
-    "number": "default",
-    "operator": "default",
-    "action": "default",
-    "title": "reverse",
+# Contraste: máximo contraste con negrita/reverse.
+CONTRAST_COLORS: dict[str, str] = {
+    "expression": "white+bold",
+    "result": "white+bold",
+    "error": "red+reverse",
+    "number": "white",
+    "operator": "white+bold",
+    "action": "white+bold",
+    "title": "white+reverse",
     "title_dim": "dim",
     "selection": "reverse",
     "hint": "dim",
@@ -140,25 +146,19 @@ ASCII_GLYPHS: dict[str, str] = {
     "root": "root",
 }
 
-# ----- presets de tema -----
+# ----- tonos de color -----
 
-THEME_ORDER = ("auto", "minimal", "boxed", "amber", "neon", "mono")
+# Orden del ciclo de la tecla T.
+THEME_ORDER = ("mono", "calido", "frio", "contraste")
+DEFAULT_TONE = "frio"
+# Con esta cantidad de filas o más se dibujan bordes (si no, modo minimal).
 BOXED_MIN_ROWS = 28
 
-THEME_PRESETS: dict[str, dict[str, str]] = {
-    "auto": {"style": "auto", "colors": "default"},
-    "minimal": {"style": "minimal", "colors": "default"},
-    "boxed": {"style": "boxed", "colors": "default"},
-    "amber": {"style": "auto", "colors": "amber"},
-    "neon": {"style": "boxed", "colors": "neon"},
-    "mono": {"style": "minimal", "colors": "mono"},
-}
-
-_PALETTES: dict[str, dict[str, str]] = {
-    "default": DEFAULT_COLORS,
-    "amber": AMBER_COLORS,
-    "neon": NEON_COLORS,
+PALETTES: dict[str, dict[str, str]] = {
     "mono": MONO_COLORS,
+    "calido": WARM_COLORS,
+    "frio": COOL_COLORS,
+    "contraste": CONTRAST_COLORS,
 }
 
 
@@ -177,7 +177,7 @@ class Theme:
 # ----- config -----
 
 DEFAULT_CONFIG: dict = {
-    "theme": "auto",
+    "theme": DEFAULT_TONE,
     "glyphs": "auto",
     "live_notation": True,
     "status_bar": True,
@@ -255,7 +255,7 @@ def theme_names() -> tuple[str, ...]:
 
 
 def next_theme(name: str) -> str:
-    """Siguiente tema en el ciclo (para la tecla T)."""
+    """Siguiente tono de color en el ciclo (para la tecla T)."""
     if name not in THEME_ORDER:
         return THEME_ORDER[0]
     return THEME_ORDER[(THEME_ORDER.index(name) + 1) % len(THEME_ORDER)]
@@ -264,17 +264,15 @@ def next_theme(name: str) -> str:
 def resolve_theme(
     cfg: dict, rows: int, use_color: bool, glyph_mode: Optional[str] = None
 ) -> Theme:
-    """Resolver el tema efectivo: estilo, paleta y glifos."""
-    name = cfg.get("theme", "auto")
-    if name not in THEME_PRESETS:
-        name = "auto"
-    preset = THEME_PRESETS[name]
+    """Resolver el tema efectivo: tono de color (config) y estilo (alto)."""
+    name = cfg.get("theme", DEFAULT_TONE)
+    if name not in PALETTES:
+        name = DEFAULT_TONE
 
-    style = preset["style"]
-    if style == "auto":
-        style = "boxed" if rows >= BOXED_MIN_ROWS else "minimal"
+    # El estilo con/sin bordes lo decide el alto, no la config.
+    style = "boxed" if rows >= BOXED_MIN_ROWS else "minimal"
 
-    colors = dict(_PALETTES.get(preset["colors"], DEFAULT_COLORS))
+    colors = dict(PALETTES[name])
     if not use_color:
         colors = dict(MONO_COLORS)
     overrides = cfg.get("colors") or {}
