@@ -42,6 +42,9 @@ class App:
         self.just_evaluated = False
         self.focus = "keyboard"  # "keyboard" | "history"
         self.pending_confirm: str | None = None
+        self._edit_counter = 0
+        self._last_tray: tuple | None = None
+        self._last_tray_edit = -1
 
         self._init_colors()
         stdscr.keypad(True)
@@ -196,15 +199,26 @@ class App:
         self.focus = "history" if self.focus == "keyboard" else "keyboard"
 
     def _history_activate(self) -> None:
-        """Poner el resultado de la entrada seleccionada en la bandeja (display).
+        """Traer el resultado de la entrada seleccionada a la bandeja (display).
 
         Se concatena al final de la expresión actual para permitir continuar,
-        p. ej. `5*` + traer resultado B -> `5*3`.
+        p. ej. `5*` + traer resultado B -> `5*3`. Re-activar el mismo ítem sin
+        editar nada entre medio no hace nada (evita que `<enter><space>` multiplique).
         """
         entry = self.history_panel.selected_entry()
         if entry is None:
             return
-        value = entry[1]
+        if (
+            self._last_tray == ("history", entry[2])
+            and self._edit_counter == self._last_tray_edit
+        ):
+            return
+        self._tray_activate_value(entry[1])
+        self._last_tray = ("history", entry[2])
+        self._last_tray_edit = self._edit_counter
+
+    def _tray_activate_value(self, value: str) -> None:
+        """Poner `value` en la bandeja, concatenando si ya hay expresión."""
         if self.just_evaluated or not self.expression:
             self.expression = value  # nueva bandeja: empieza limpio
         else:
@@ -223,8 +237,9 @@ class App:
         if self.just_evaluated:
             self.expression = self.result_display + char if char in "+-*/%!" else char
             self.just_evaluated = False
-            return
-        self.expression += char
+        else:
+            self.expression += char
+        self._edit_counter += 1
 
     def _handle_action(self, action: str, char: str) -> None:
         if action == "insert":
@@ -234,9 +249,11 @@ class App:
             self.result_display = ""
             self.error = ""
             self.just_evaluated = False
+            self._edit_counter += 1
         elif action == "back":
             self.expression = self.expression[:-1]
             self.error = ""
+            self._edit_counter += 1
         elif action == "eval":
             if self.expression.strip() == "":
                 return
@@ -250,8 +267,11 @@ class App:
                 self.just_evaluated = True
             except (CalcSyntaxError, CalcMathError, ValueError, KeyError) as exc:
                 self.error = str(exc)
+            finally:
+                self._edit_counter += 1
         elif action == "ans":
             if self.result_display:
                 self.expression = self.result_display
                 self.just_evaluated = False
                 self.error = ""
+                self._edit_counter += 1
