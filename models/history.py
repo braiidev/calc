@@ -30,6 +30,14 @@ class History:
         """Agregar una operación (cola de la más reciente al final)."""
         self._entries.append(HistoryEntry(expr, result, notation))
 
+    def entries(self) -> list[HistoryEntry]:
+        """Todas las entradas, de la más antigua a la más reciente."""
+        return list(self._entries)
+
+    def load_entries(self, entries: list[HistoryEntry]) -> None:
+        """Reemplazar el contenido por `entries` (recorta al tamaño máximo)."""
+        self._entries = deque(entries[-self._max_size :], maxlen=self._max_size)
+
     def delete_at(self, index: int) -> bool:
         """Eliminar la entrada en `index`. Retorna True si existía."""
         if index < 0 or index >= len(self._entries):

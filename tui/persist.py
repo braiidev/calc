@@ -1,16 +1,18 @@
-"""Persistencia de las variables de usuario en un JSON aparte de la config.
+"""Persistencia de variables e historial en JSON aparte de la config.
 
-El archivo vive junto al config (`~/.config/calc/variables.json`), respetando
-los overrides de `config_path()`. La escritura es atómica y best-effort.
+Los archivos viven junto al config (`~/.config/calc/`), respetando los overrides
+de `config_path()`. La escritura es atómica y best-effort.
 """
 
 import json
 from pathlib import Path
 from typing import Optional
 
+from models.history import HistoryEntry
 from tui.theme import config_path
 
 FILENAME = "variables.json"
+HISTORY_FILENAME = "history.json"
 
 
 def variables_path() -> Path:
@@ -47,6 +49,50 @@ def save_variables(store: dict[str, float], path: Optional[Path] = None) -> None
             json.dumps(store, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )
+        tmp.replace(target)
+    except OSError:
+        pass
+
+
+def history_path() -> Path:
+    """Ruta del archivo de historial, junto al config del usuario."""
+    return config_path().with_name(HISTORY_FILENAME)
+
+
+def load_history(path: Optional[Path] = None) -> list[HistoryEntry]:
+    """Leer el historial; [] si no existe, está corrupto o es inválido."""
+    target = path or history_path()
+    try:
+        raw = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(raw, list):
+        return []
+    result: list[HistoryEntry] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        expr = item.get("expr")
+        value = item.get("result")
+        notation = item.get("notation", "")
+        if not isinstance(expr, str) or not isinstance(value, str):
+            continue
+        if not isinstance(notation, str):
+            notation = ""
+        result.append(HistoryEntry(expr, value, notation))
+    return result
+
+
+def save_history(entries: list[HistoryEntry], path: Optional[Path] = None) -> None:
+    """Escribir el historial de forma atómica (ignora errores de E/S)."""
+    target = path or history_path()
+    data = [
+        {"expr": e.expr, "result": e.result, "notation": e.notation} for e in entries
+    ]
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_name(target.name + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(target)
     except OSError:
         pass

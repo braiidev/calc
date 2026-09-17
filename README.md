@@ -88,7 +88,8 @@ La notación semántica aparece en el historial: `[floor]`, `[sqrt]`, `[cbrt]`,
 
 - Al asignar (`x = 5`) el valor se guarda en `variables.json` (escritura
   atómica). Las asignaciones **no** van al historial.
-- El historial es por sesión (máximo 20 entradas).
+- El historial se guarda en `history.json` (máximo 20 entradas) y se restaura
+  al arrancar.
 - Datos en `~/.config/calc/` junto al config.
 
 ## Configuración

@@ -98,6 +98,7 @@ def make_app() -> App:
     app._last_tray_edit = -1
     app.too_small = False
     app.variables_path = None  # sin persistencia por defecto en tests
+    app.history_path = None
     app.theme = resolve_theme({}, 24, False)
     app.update_available = False
     app.update_label = ""
@@ -367,6 +368,26 @@ def test_toggle_focus_ciclo() -> None:
     assert app.focus == "vars"
     app._toggle_focus()
     assert app.focus == "keyboard"
+
+
+def test_eval_persiste_historial(tmp_path) -> None:
+    app = make_app()
+    app.history_path = tmp_path / "history.json"
+    for char in "2+3":
+        app._insert(char)
+    app._handle_action("eval", "")
+    data = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
+    assert data[0]["expr"] == "2+3"
+    assert data[0]["result"] == "5"
+
+
+def test_asignacion_no_persiste_historial(tmp_path) -> None:
+    app = make_app()
+    app.history_path = tmp_path / "history.json"
+    for char in "x=5":
+        app._insert(char)
+    app._handle_action("eval", "")
+    assert not (tmp_path / "history.json").exists()
 
 
 def test_asignacion_desde_tui() -> None:

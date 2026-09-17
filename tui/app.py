@@ -12,7 +12,14 @@ from tui.display import Display
 from tui.help_panel import HelpPanel
 from tui.history_panel import HistoryPanel
 from tui.keyboard import Keyboard
-from tui.persist import load_variables, save_variables, variables_path
+from tui.persist import (
+    history_path,
+    load_history,
+    load_variables,
+    save_history,
+    save_variables,
+    variables_path,
+)
 from tui.theme import (
     ensure_config,
     init_colors,
@@ -72,6 +79,8 @@ class App:
         self.variables_path: Path | None = variables_path()
         self.calc.variables.load_user_vars(load_variables(self.variables_path))
         self.history = History()
+        self.history_path: Path | None = history_path()
+        self.history.load_entries(load_history(self.history_path))
         self.expression = ""
         self.result_display = ""
         self.error = ""
@@ -503,7 +512,8 @@ class App:
         elif ch == ord("l"):
             self.history_panel.to_last()
         elif ch in (ord("d"), ord("D")):
-            self.history_panel.delete_selected()
+            if self.history_panel.delete_selected():
+                self._persist_history()
         elif ch in (ord("x"), ord("X")):
             if len(self.history):
                 self._ask_confirm("¿Borrar todo el historial? (y/N)", "clear_history")
@@ -541,6 +551,12 @@ class App:
         if self.variables_path is None:
             return
         save_variables(self.calc.variables.user_vars(), self.variables_path)
+
+    def _persist_history(self) -> None:
+        """Guardar el historial (best-effort)."""
+        if self.history_path is None:
+            return
+        save_history(self.history.entries(), self.history_path)
 
     # ----- actualización -----
 
@@ -629,6 +645,7 @@ class App:
         else:
             self.history.clear()
             self.history_panel.reset_selection()
+            self._persist_history()
 
     def _toggle_focus(self) -> None:
         idx = _FOCUS_ORDER.index(self.focus)
@@ -724,6 +741,7 @@ class App:
                 ):  # las asignaciones van a variables, no al historial
                     self.history.add(expr, formatted, self.calc.notation(expr))
                     self.history_panel.reset_selection()
+                    self._persist_history()
                 self.result_display = formatted
                 self.error = ""
                 self.just_evaluated = True
