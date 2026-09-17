@@ -78,6 +78,7 @@ class App:
         self.just_evaluated = False
         self.focus = "keyboard"  # "keyboard" | "history" | "vars"
         self.show_help = False
+        self.editing = False  # modo edición: tipeo libre (ver `e`)
         self.pending_confirm: str | None = None
         self._pending_confirm_action: str = "clear_history"
         self._edit_counter = 0
@@ -274,6 +275,8 @@ class App:
         if self.update_available:
             label = f" {self.update_label}" if self.update_label else ""
             update = f" · U actualizar{label}"
+        if self.editing:
+            return f"{prompt} edición · tipeá texto · enter/space evaluar · esc salir{update}"
         if self.show_help:
             return f"{prompt} ayuda · ? o esc cerrar · q salir"
         if not self.theme.status_bar:
@@ -316,6 +319,10 @@ class App:
             self._process_confirm(ch)
             return False
 
+        if self.editing:  # modo edición: casi todo es texto
+            self._handle_edit_key(ch)
+            return False
+
         if self.show_help:  # modal: solo cierra o sale
             if ch in (ord("?"), 27):
                 self.show_help = False
@@ -336,6 +343,9 @@ class App:
             return False
         if ch == ord("U"):
             self._handle_update_key()
+            return False
+        if ch in (ord("e"), ord("E")):
+            self._enter_edit()
             return False
         if ch == 27:  # ESC: limpiar display
             self._handle_action("clear", "")
@@ -371,12 +381,32 @@ class App:
             if self._handle_keyboard_key(ch):
                 return False
 
-        # Insertable: dígitos, operadores y letras (identificadores) en ambos focos
+        # Insertable directo: solo dígitos y operadores. Las letras son comandos
+        # (navegación/atajos); para texto libre usá el modo edición (`e`).
         if 32 < ch <= 126:
             c = chr(ch)
-            if c.isalnum() or c in OPERATOR_LITERALS:
+            if c.isdigit() or c in OPERATOR_LITERALS:
                 self._insert(c)
         return False
+
+    def _enter_edit(self) -> None:
+        """Entrar al modo edición: tipeo libre, enter/space evalúa y sale."""
+        self.editing = True
+        self.show_help = False
+        self.error = ""
+        self._update_message = ""
+
+    def _handle_edit_key(self, ch: int) -> None:
+        """Teclas en modo edición (todo imprimible salvo espacio se inserta)."""
+        if ch in KEY_ENTER or ch == SPACE:
+            self.editing = False
+            self._handle_action("eval", "")
+        elif ch == 27:  # esc: salir sin evaluar
+            self.editing = False
+        elif ch in KEY_BACKSPACE:
+            self._handle_action("back", "")
+        elif 32 < ch <= 126:
+            self._insert(chr(ch))
 
     def _handle_keyboard_key(self, ch: int) -> bool:
         """Teclas del foco teclado. Retorna True si se consumieron."""

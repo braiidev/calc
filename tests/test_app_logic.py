@@ -60,6 +60,7 @@ def make_app() -> App:
     app.just_evaluated = False
     app.focus = "keyboard"
     app.show_help = False
+    app.editing = False
     app.pending_confirm = None
     app._pending_confirm_action = "clear_history"
     app._edit_counter = 0
@@ -426,3 +427,80 @@ def test_insert_limpia_mensaje_de_update() -> None:
     app._update_message = "estás al día (v0.8)"
     app._insert("5")
     assert app._update_message == ""
+
+
+def _feed(app, text: str) -> None:
+    for char in text:
+        app._handle_key(ord(char))
+
+
+def test_e_entra_en_modo_edicion() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    assert app.editing is True
+    assert "edición" in app._status_text()
+
+
+def test_edicion_permite_letras_que_eran_comandos() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "hola=5")
+    assert app.expression == "hola=5"
+
+
+def test_edicion_enter_evalua_guarda_y_sale() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "x=9")
+    app._handle_key(10)
+    assert app.editing is False
+    assert app.calc.variables.get("x") == 9
+
+
+def test_edicion_space_evalua_y_sale() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "2+3")
+    app._handle_key(32)
+    assert app.editing is False
+    assert app.result_display == "5"
+
+
+def test_edicion_esc_sale_sin_evaluar() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "2+")
+    app._handle_key(27)
+    assert app.editing is False
+    assert app.expression == "2+"
+    assert app.result_display == ""
+
+
+def test_edicion_q_es_texto_no_salida() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    assert app._handle_key(ord("q")) is False
+    assert app.expression == "q"
+
+
+def test_edicion_backspace_borra() -> None:
+    app = make_app()
+    app._handle_key(ord("e"))
+    _feed(app, "ab")
+    app._handle_key(127)
+    assert app.expression == "a"
+
+
+def test_normal_no_inserta_letras_sueltas() -> None:
+    app = make_app()
+    app.focus = "history"  # evita depender del widget de teclado
+    app._handle_key(ord("a"))
+    assert app.expression == ""
+
+
+def test_normal_si_inserta_digitos_y_operadores() -> None:
+    app = make_app()
+    app.focus = "history"
+    app._handle_key(ord("7"))
+    app._handle_key(ord("+"))
+    assert app.expression == "7+"

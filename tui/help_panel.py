@@ -15,9 +15,10 @@ _HELP_LINES = [
     "VARIABLES  pi, e (constantes) · x = 5 (asignar)",
     "",
     "TECLAS",
+    "  e editar (texto libre) · enter/space evaluar · esc salir de edición",
     "  tab foco · enter/space evaluar o traer valor",
     "  esc/D limpiar · c borrar · d borrar ítem · q salir",
-    "  T color · U actualizar · ? ayuda · q salir",
+    "  T color · U actualizar · ? ayuda",
 ]
 
 
