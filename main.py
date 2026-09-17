@@ -11,7 +11,7 @@ from pathlib import Path
 
 from tui.app import App
 
-VERSION = "v0.8"
+VERSION = "v0.9"
 
 
 def _repo_root() -> str:

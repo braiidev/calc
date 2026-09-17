@@ -29,7 +29,7 @@ for arg in "$@"; do
 done
 
 if [ "$ACTION" = "version" ]; then
-    echo "calc-installer v0.8"
+    echo "calc-installer v0.9"
     exit 0
 fi
 
