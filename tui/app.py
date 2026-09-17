@@ -11,9 +11,15 @@ from tui.keyboard import Keyboard, PAIR_NUM, PAIR_OP, PAIR_ACTION
 # Código de tecla: backspace puede venir como 127 o 8
 KEY_BACKSPACE = (curses.KEY_BACKSPACE, 127, 8, curses.KEY_DC)
 KEY_ENTER = (10, 13, curses.KEY_ENTER)
+TAB = 9
+SPACE = 32
+INSERTABLE = "0123456789.+-*/()%!"
 
 DISPLAY_H = 4
 KEYBOARD_H = 5
+
+K_HINT = "teclado  · tab foco · q salir"
+H_HINT = "historial · tab foco · q salir"
 
 
 def format_result(value: float) -> str:
@@ -24,7 +30,7 @@ def format_result(value: float) -> str:
 
 
 class App:
-    """Calculadora TUI."""
+    """Calculadora TUI con focus conmutado entre historial y teclado."""
 
     def __init__(self, stdscr) -> None:
         self.stdscr = stdscr
@@ -34,6 +40,8 @@ class App:
         self.result_display = ""
         self.error = ""
         self.just_evaluated = False
+        self.focus = "keyboard"   # "keyboard" | "history"
+        self.pending_confirm: str | None = None
 
         self._init_colors()
         stdscr.keypad(True)
@@ -69,66 +77,132 @@ class App:
         while True:
             self._render()
             ch = self.stdscr.getch()
-            if ch in (ord("q"), ord("Q")):  # q/Q: salir
-                break
-            if ch == 27:  # ESC: limpiar
-                self._handle_action("clear", "")
-                continue
-            if ch in (ord("c"), ord("C")):  # c/C: limpiar historial
-                self.history.clear()
-                self.history_panel.reset_scroll()
-                continue
             if ch == curses.KEY_RESIZE:
                 curses.resizeterm(*self.stdscr.getmaxyx())
                 self._make_windows()
                 continue
-            self._handle_key(ch)
+            if self._handle_key(ch):
+                break
 
     # ----- render -----
 
     def _render(self) -> None:
-        if not self.error:
+        if not self.error and not self.pending_confirm:
             try:
                 self.result_display = format_result(self.calc.evaluate(self.expression))
             except (CalcSyntaxError, CalcMathError, ValueError):
                 self.result_display = ""
-        self.display.render(self.expression, self.result_display, self.error)
+        message = self.pending_confirm or self.error
+        hint = H_HINT if self.focus == "history" else K_HINT
+        self.display.render(self.expression, self.result_display, message, hint)
         self.history_panel.render()
         self.keyboard.render(highlight=self.expression[-1] if self.expression else None)
         self.stdscr.refresh()
 
-    # ----- input -----
+    # ----- entrada -----
 
-    def _handle_key(self, ch: int) -> None:
-        # Navegación con flechas sobre los botones
-        if ch == curses.KEY_LEFT:
-            self.keyboard.move(0, -1)
-            return
-        if ch == curses.KEY_RIGHT:
-            self.keyboard.move(0, 1)
-            return
-        if ch == curses.KEY_UP:
-            self.history_panel.scroll(1)
-            return
-        if ch == curses.KEY_DOWN:
-            self.history_panel.scroll(-1)
-            return
+    def _handle_key(self, ch: int) -> bool:
+        """Procesar tecla. Retorna True si la app debe salir."""
+        if self.pending_confirm:
+            self._process_confirm(ch)
+            return False
+
+        if ch == TAB:
+            self._toggle_focus()
+            return False
+        if ch in (ord("q"), ord("Q")):
+            return True
+        if ch == 27:  # ESC: limpiar display
+            self._handle_action("clear", "")
+            return False
+
+        # Enter y Space según el foco
         if ch in KEY_ENTER:
-            self._handle_action("eval", "")
-            return
-        if ch == 32:  # SPACE: activar botón enfocado
-            action, char = self.keyboard.focused_action()
-            self._handle_action(action, char)
-            return
-        if ch in KEY_BACKSPACE:
-            self._handle_action("back", "")
-            return
-        if ch < 32 or ch > 126:
-            return  # tecla sin mapear
+            if self.focus == "history":
+                self._history_activate()
+            else:
+                self._handle_action("eval", "")
+            return False
+        if ch == SPACE:
+            if self.focus == "history":
+                self._history_activate()
+            else:
+                action, char = self.keyboard.focused_action()
+                self._handle_action(action, char)
+            return False
 
-        char = chr(ch)
-        if char in "0123456789.+-*/()%!":
-            self._insert(char)
+        # Navegación y acciones según el foco
+        if self.focus == "history":
+            if self._handle_history_key(ch):
+                return False
+        else:
+            if self._handle_keyboard_key(ch):
+                return False
+
+        # Insertable: dígitos y operadores en ambos focos
+        if 32 < ch <= 126 and chr(ch) in INSERTABLE:
+            self._insert(chr(ch))
+        return False
+
+    def _handle_keyboard_key(self, ch: int) -> bool:
+        """Teclas del foco teclado. Retorna True si se consumieron."""
+        if ch in (ord("h"), curses.KEY_LEFT):
+            self.keyboard.move(0, -1)
+        elif ch in (ord("l"), curses.KEY_RIGHT):
+            self.keyboard.move(0, 1)
+        elif ch in (ord("j"), curses.KEY_DOWN):
+            self.keyboard.move(1, 0)
+        elif ch in (ord("k"), curses.KEY_UP):
+            self.keyboard.move(-1, 0)
+        elif ch in (ord("c"), ord("C")):
+            self._handle_action("back", "")
+        elif ch in (ord("d"), ord("D")):
+            self._handle_action("clear", "")
+        elif ch in KEY_BACKSPACE:
+            self._handle_action("back", "")
+        else:
+            return False
+        return True
+
+    def _handle_history_key(self, ch: int) -> bool:
+        """Teclas del foco historial. Retorna True si se consumieron."""
+        if ch in (ord("j"), curses.KEY_DOWN):
+            self.history_panel.move(1)
+        elif ch in (ord("k"), curses.KEY_UP):
+            self.history_panel.move(-1)
+        elif ch == ord("h"):
+            self.history_panel.to_first()
+        elif ch == ord("l"):
+            self.history_panel.to_last()
+        elif ch in (ord("d"), ord("D")):
+            self.history_panel.delete_selected()
+        elif ch in (ord("x"), ord("X")):
+            if len(self.history):
+                self.pending_confirm = "¿Borrar todo el historial? (y/N)"
+        else:
+            return False
+        return True
+
+    def _process_confirm(self, ch: int) -> None:
+        """Manejar la confirmación de borrar historial."""
+        if ch in (ord("y"), ord("Y")):
+            self.history.clear()
+            self.history_panel.reset_selection()
+        self.pending_confirm = None  # cualquier otra tecla cancela
+
+    def _toggle_focus(self) -> None:
+        self.focus = "history" if self.focus == "keyboard" else "keyboard"
+
+    def _history_activate(self) -> None:
+        """Poner el resultado de la entrada seleccionada en la bandeja (display)."""
+        entry = self.history_panel.selected_entry()
+        if entry is None:
+            return
+        self.expression = entry[1]  # resultado como base de la expresión
+        self.just_evaluated = False
+        self.error = ""
+
+    # ----- acciones -----
 
     def _insert(self, char: str) -> None:
         self.error = ""
@@ -156,7 +230,7 @@ class App:
                 value = self.calc.evaluate(self.expression)
                 formatted = format_result(value)
                 self.history.add(self.expression, formatted)
-                self.history_panel.reset_scroll()
+                self.history_panel.reset_selection()
                 self.result_display = formatted
                 self.error = ""
                 self.just_evaluated = True

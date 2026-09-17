@@ -11,11 +11,21 @@ class History:
     """
 
     def __init__(self, max_size: int = 20) -> None:
+        self._max_size = max_size
         self._entries: deque[tuple[str, str]] = deque(maxlen=max_size)
 
     def add(self, expr: str, result: str) -> None:
         """Agregar una operación (colas de la más reciente al final)."""
         self._entries.append((expr, result))
+
+    def delete_at(self, index: int) -> bool:
+        """Eliminar la entrada en `index`. Retorna True si existía."""
+        if index < 0 or index >= len(self._entries):
+            return False
+        items = list(self._entries)
+        del items[index]
+        self._entries = deque(items, maxlen=self._max_size)
+        return True
 
     def clear(self) -> None:
         """Vaciar el historial."""

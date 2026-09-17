@@ -1,7 +1,7 @@
 """Lexer, parser y evaluator de expresiones matemáticas.
 
 Operadores soportados:
-- Aritmética básica: + - * / ( )
+- Aritmética básica: + - * / // ( )
 - Científica (v0.2): ** (potencia), % (módulo), ! (factorial), sqrt()
 """
 
@@ -17,6 +17,7 @@ class TokType(Enum):
     MINUS = auto()
     MULT = auto()
     DIV = auto()
+    FLDIV = auto()
     MOD = auto()
     POW = auto()
     FACT = auto()
@@ -105,6 +106,10 @@ def tokenize(expr: str) -> list[Token]:
             tokens.append(Token(TokType.POW, lexeme="**"))
             i += 2
             continue
+        if ch == "/" and i + 1 < n and expr[i + 1] == "/":
+            tokens.append(Token(TokType.FLDIV, lexeme="//"))
+            i += 2
+            continue
         if ch.isalpha() or ch == "_":
             j = i
             while j < n and (expr[j].isalnum() or expr[j] == "_"):
@@ -132,7 +137,7 @@ class Parser:
     """Parser por descenso recursivo. Precedencia (de menor a mayor):
 
     expr    := term (('+' | '-') term)*
-    term    := unary (('*' | '/' | '%') unary)*
+    term    := unary (('*' | '/' | '//' | '%') unary)*
     unary   := '-' unary | power
     power   := postfix ('**' unary)?            # asociativa a la derecha
     postfix := primary ('!')*
@@ -142,6 +147,7 @@ class Parser:
     _TERM_OPS = {
         TokType.MULT: "*",
         TokType.DIV: "/",
+        TokType.FLDIV: "//",
         TokType.MOD: "%",
     }
 
@@ -280,6 +286,10 @@ def _apply_binop(op: str, left: float, right: float) -> float:
         if right == 0:
             raise CalcMathError("División por cero")
         return left / right
+    if op == "//":
+        if right == 0:
+            raise CalcMathError("División por cero")
+        return left // right
     if op == "%":
         if right == 0:
             raise CalcMathError("División por cero")
