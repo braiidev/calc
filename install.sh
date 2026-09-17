@@ -66,6 +66,8 @@ if [ "$ACTION" = "uninstall" ]; then
     if [ -e "$BIN" ]; then
         if ! command -v sudo >/dev/null 2>&1; then
             echo "Aviso: falta 'sudo'; no se pudo quitar $BIN. Borralo a mano." >&2
+        elif ! grep -q "main.py" "$BIN" 2>/dev/null; then
+            echo "Aviso: $BIN no parece el wrapper de calc; no se borra." >&2
         else
             echo "Eliminando wrapper $BIN (pedirá sudo)..."
             sudo rm -f "$BIN"
