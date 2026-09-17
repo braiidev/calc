@@ -4,7 +4,7 @@ import json
 
 from calculator import Calculator
 from models.history import History
-from tui.app import App
+from tui.app import TICK_MS, App
 from tui.theme import resolve_theme
 
 
@@ -57,6 +57,22 @@ class StubHelpPanel:
 
     def scroll(self, delta: int) -> None:
         self.offset += delta
+
+
+class StubScr:
+    def __init__(self) -> None:
+        self.timeout_value: int | None = None
+
+    def timeout(self, value: int) -> None:
+        self.timeout_value = value
+
+
+class StubThread:
+    def __init__(self, alive: bool) -> None:
+        self._alive = alive
+
+    def is_alive(self) -> bool:
+        return self._alive
 
 
 def make_app() -> App:
@@ -323,6 +339,22 @@ def test_status_menciona_e_editar() -> None:
     app = make_app()
     app.focus = "history"
     assert "e editar" in app._status_text()
+
+
+def test_timeout_bloquea_en_reposo() -> None:
+    app = make_app()
+    app.stdscr = StubScr()  # type: ignore[assignment]
+    app._update_thread = None
+    app._apply_timeout()
+    assert app.stdscr.timeout_value == -1
+
+
+def test_timeout_tickea_mientras_chequea() -> None:
+    app = make_app()
+    app.stdscr = StubScr()  # type: ignore[assignment]
+    app._update_thread = StubThread(True)  # type: ignore[assignment]
+    app._apply_timeout()
+    assert app.stdscr.timeout_value == TICK_MS
 
 
 def test_toggle_focus_ciclo() -> None:

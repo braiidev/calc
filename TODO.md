@@ -6,6 +6,7 @@
 ## Next
 
 ## Done
+- [x] v0.9.3 - Loop sin despertar en reposo (timeout solo durante el chequeo de update)
 - [x] v0.9.2 - Pista `e editar` en la barra/ayuda y panel de ayuda desplazable con j/k
 - [x] v0.9.1 - Modo edición (`e`): tipeo libre; enter/space evalúa y sale, esc sale sin evaluar; en modo normal las letras ya no se insertan (son comandos)
 - [x] v0.8.4 - Auditoría: hardening de uninstall/wrapper, rama remota por defecto, validación de --purge, reinicio robusto

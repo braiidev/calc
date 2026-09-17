@@ -178,8 +178,8 @@ class App:
         self.stdscr.refresh()
         if is_auto_update_enabled():
             self._start_update_check()
-        self.stdscr.timeout(TICK_MS)
         while True:
+            self._apply_timeout()
             self._render()
             ch = self.stdscr.getch()
             if ch == -1:  # tick: el update en background puede haber cambiado algo
@@ -189,6 +189,15 @@ class App:
                 continue
             if self._handle_key(ch):
                 break
+
+    def _apply_timeout(self) -> None:
+        """Despertar periódicamente solo mientras hay un update check en curso.
+
+        En reposo `getch` bloquea (timeout -1) y la TUI no consume CPU; durante
+        el chequeo en background se refresca para mostrar el resultado.
+        """
+        pending = self._update_thread is not None and self._update_thread.is_alive()
+        self.stdscr.timeout(TICK_MS if pending else -1)
 
     def _on_resize(self) -> None:
         """Reconstruir el layout tras un resize.
