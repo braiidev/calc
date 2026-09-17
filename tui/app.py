@@ -1,6 +1,9 @@
 """Aplicación TUI principal: loop de curses y manejo de eventos."""
 
 import curses
+import os
+import sys
+import threading
 from pathlib import Path
 
 from calculator import Calculator, CalcSyntaxError, CalcMathError
@@ -18,6 +21,7 @@ from tui.theme import (
     role_attrs,
     save_config,
 )
+from tui.update import check_update, do_update, is_auto_update_enabled, repo_root
 from tui.vars_panel import VarsPanel
 
 # Código de tecla: backspace puede venir como 127 o 8
@@ -39,6 +43,11 @@ MIN_COLS = 30  # ancho mínimo del grid del teclado (6 * 5)
 #   F = una sola sección, la del foco (espacio reducido)
 MID_WIDE_MIN_COLS = 70
 MID_STACK_MIN_ROWS = 18
+
+# Cada cuánto despierta getch para refrescar la UI (p. ej. cuando el chequeo
+# de actualización en background termina). No bloquea: ncurses no redibuja lo
+# que no cambió.
+TICK_MS = 400
 
 K_HINT = "teclado  · tab foco · ? ayuda · q salir"
 H_HINT = "historial · tab foco · ? ayuda · q salir"
@@ -74,6 +83,13 @@ class App:
         self._edit_counter = 0
         self._last_tray: tuple | None = None
         self._last_tray_edit = -1
+
+        self.update_available = False
+        self.update_label = ""
+        self._update_checked = False
+        self._update_requested = False
+        self._update_message = ""
+        self._update_thread: threading.Thread | None = None
 
         self.config = ensure_config()
         self._use_color = init_colors()
@@ -159,9 +175,14 @@ class App:
         # en negro hasta el primer evento (clearok + refresh de subwindows).
         self.stdscr.clear()
         self.stdscr.refresh()
+        if is_auto_update_enabled():
+            self._start_update_check()
+        self.stdscr.timeout(TICK_MS)
         while True:
             self._render()
             ch = self.stdscr.getch()
+            if ch == -1:  # tick: el update en background puede haber cambiado algo
+                continue
             if ch == curses.KEY_RESIZE:
                 self._on_resize()
                 continue
@@ -199,7 +220,7 @@ class App:
         notation = ""
         if self.theme.live_notation and self.expression and not self.error:
             notation = self.calc.notation(self.expression)
-        message = self.pending_confirm or self.error
+        message = self.pending_confirm or self.error or self._update_message
         hint = self._status_text()
         self.display.render(
             self.expression, self.result_display, message, hint, notation
@@ -249,10 +270,15 @@ class App:
     def _status_text(self) -> str:
         """Barra: `<modo> · <acción bajo cursor> · tab <destino> · ? ayuda · q salir`."""
         prompt = self.theme.glyphs.get("prompt", ">")
+        update = ""
+        if self.update_available:
+            label = f" {self.update_label}" if self.update_label else ""
+            update = f" · U actualizar{label}"
         if self.show_help:
             return f"{prompt} ayuda · ? o esc cerrar · q salir"
         if not self.theme.status_bar:
-            return {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
+            base = {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
+            return base + update
         if self.focus == "keyboard":
             desc = self.keyboard.focused_description()
             item = f"«{desc}»" if desc else "—"
@@ -262,7 +288,7 @@ class App:
             item = self._vars_item()
         mode = self._MODE_LABEL[self.focus]
         nxt = self._NEXT_FOCUS[self.focus]
-        return f"{prompt} {mode} · {item} · tab {nxt} · ? ayuda · q salir"
+        return f"{prompt} {mode} · {item} · tab {nxt} · ? ayuda · q salir{update}"
 
     def _history_item(self) -> str:
         """Entrada seleccionada del historial como texto `expr = result`."""
@@ -307,6 +333,9 @@ class App:
             return False
         if ch == ord("T"):
             self._cycle_theme()
+            return False
+        if ch == ord("U"):
+            self._handle_update_key()
             return False
         if ch == 27:  # ESC: limpiar display
             self._handle_action("clear", "")
@@ -419,21 +448,89 @@ class App:
             return
         save_variables(self.calc.variables.user_vars(), self.variables_path)
 
+    # ----- actualización -----
+
+    def _start_update_check(self) -> None:
+        """Lanzar el chequeo de actualización en background.
+
+        Reutiliza el hilo en curso; si ya terminó, arranca uno nuevo para poder
+        re-verificar a pedido (`U`) sin bloquear la TUI.
+        """
+        if self._update_thread is not None and not self._update_checked:
+            return
+        self._update_checked = False
+        self._update_thread = threading.Thread(
+            target=self._check_updates_bg, name="calc-update-check", daemon=True
+        )
+        self._update_thread.start()
+
+    def _check_updates_bg(self) -> None:
+        """Correr en background: solo toca flags simples que el loop relee."""
+        info = check_update(repo_root())
+        if info.ok and info.behind > 0:
+            self.update_available = True
+            self.update_label = info.available
+        if self._update_requested:
+            if not info.ok:
+                self._update_message = (
+                    "no se pudo verificar (sin conexión o sin remoto)"
+                )
+            elif info.behind == 0:
+                self._update_message = f"estás al día ({info.current})"
+            else:
+                self._update_message = ""
+            self._update_requested = False
+        self._update_checked = True
+
+    def _handle_update_key(self) -> None:
+        """Tecla `U`: aplicar si hay update, o verificar en background."""
+        if self.update_available:
+            self._ask_confirm("¿Actualizar y reiniciar? (y/N)", "do_update")
+            return
+        self._update_requested = True
+        self._update_message = "verificando actualizaciones…"
+        self._start_update_check()
+
+    def _apply_update_and_restart(self) -> None:
+        """Bajar la actualización (git) y reiniciar el proceso."""
+        self._update_message = "actualizando…"
+        self._render()
+        result = do_update(repo_root())
+        if not result.ok:
+            self.error = result.message
+            self._update_message = ""
+            return
+        self.error = ""
+        self._update_message = result.message
+        self._restart()
+
+    def _restart(self) -> None:
+        """Reemplazar el proceso actual por uno nuevo (ya con el código nuevo)."""
+        try:
+            curses.endwin()
+        except Exception:  # noqa: BLE001 — pase lo que pase, hay que reiniciar
+            pass
+        os.execv(sys.executable, [sys.executable, os.path.abspath(sys.argv[0])])
+
     def _ask_confirm(self, message: str, action: str) -> None:
         self.pending_confirm = message
         self._pending_confirm_action = action
 
     def _process_confirm(self, ch: int) -> None:
-        """Manejar la confirmación de borrado (historial o variables)."""
-        if ch in (ord("y"), ord("Y")):
-            if self._pending_confirm_action == "clear_vars":
-                self.calc.variables.clear()
-                self.vars_panel.reset_selection()
-                self._persist_variables()
-            else:
-                self.history.clear()
-                self.history_panel.reset_selection()
+        """Manejar la confirmación de borrado o de actualización."""
+        action = self._pending_confirm_action
         self.pending_confirm = None  # cualquier otra tecla cancela
+        if ch not in (ord("y"), ord("Y")):
+            return
+        if action == "do_update":
+            self._apply_update_and_restart()
+        elif action == "clear_vars":
+            self.calc.variables.clear()
+            self.vars_panel.reset_selection()
+            self._persist_variables()
+        else:
+            self.history.clear()
+            self.history_panel.reset_selection()
 
     def _toggle_focus(self) -> None:
         idx = _FOCUS_ORDER.index(self.focus)

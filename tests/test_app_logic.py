@@ -67,6 +67,13 @@ def make_app() -> App:
     app._last_tray_edit = -1
     app.too_small = False
     app.variables_path = None  # sin persistencia por defecto en tests
+    app.theme = resolve_theme({}, 24, False)
+    app.update_available = False
+    app.update_label = ""
+    app._update_checked = False
+    app._update_requested = False
+    app._update_message = ""
+    app._update_thread = None
     return app
 
 
@@ -360,3 +367,55 @@ def test_historial_guarda_notacion() -> None:
     entry = app.history[0]
     assert entry is not None
     assert entry.notation == "[cbrt]"
+
+
+def test_status_muestra_actualizacion_disponible() -> None:
+    app = make_app()
+    app.focus = "history"
+    app.update_available = True
+    app.update_label = "v0.9"
+    assert "U actualizar v0.9" in app._status_text()
+
+
+def test_status_sin_update_no_menciona_U() -> None:
+    app = make_app()
+    app.focus = "history"
+    assert "U actualizar" not in app._status_text()
+
+
+def test_U_con_update_pide_confirmacion() -> None:
+    app = make_app()
+    app.update_available = True
+    app._handle_key(ord("U"))
+    assert app.pending_confirm is not None
+    assert app._pending_confirm_action == "do_update"
+
+
+def test_U_sin_update_dispara_verificacion(monkeypatch) -> None:
+    app = make_app()
+    started: list[bool] = []
+    app._start_update_check = lambda: started.append(True)  # type: ignore[method-assign]
+    app._handle_key(ord("U"))
+    assert started
+    assert app._update_requested is True
+    assert "verificando" in app._update_message
+
+
+def test_confirmar_update_aplica_y_reinicia(monkeypatch) -> None:
+    app = make_app()
+    called: list[bool] = []
+    app._apply_update_and_restart = lambda: called.append(True)  # type: ignore[method-assign]
+    app._ask_confirm("¿Actualizar y reiniciar? (y/N)", "do_update")
+    app._process_confirm(ord("y"))
+    assert called
+    assert app.pending_confirm is None
+
+
+def test_cancelar_update_no_aplica() -> None:
+    app = make_app()
+    called: list[bool] = []
+    app._apply_update_and_restart = lambda: called.append(True)  # type: ignore[method-assign]
+    app._ask_confirm("¿Actualizar y reiniciar? (y/N)", "do_update")
+    app._process_confirm(ord("n"))
+    assert not called
+    assert app.pending_confirm is None
