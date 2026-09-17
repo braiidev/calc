@@ -5,6 +5,7 @@ import curses
 from calculator import Calculator, CalcSyntaxError, CalcMathError
 from models.history import History
 from tui.display import Display
+from tui.help_panel import HelpPanel
 from tui.history_panel import HistoryPanel
 from tui.keyboard import Keyboard, PAIR_NUM, PAIR_OP, PAIR_ACTION
 from tui.vars_panel import VarsPanel
@@ -20,9 +21,10 @@ OPERATOR_LITERALS = "+-*/()%!,="
 DISPLAY_H = 4
 KEYBOARD_H = 5
 
-K_HINT = "teclado  · tab foco · q salir"
-H_HINT = "historial · tab foco · q salir"
-V_HINT = "variables · tab foco · q salir"
+K_HINT = "teclado  · tab foco · ? ayuda · q salir"
+H_HINT = "historial · tab foco · ? ayuda · q salir"
+V_HINT = "variables · tab foco · ? ayuda · q salir"
+HELP_HINT = "ayuda · ? o esc cerrar · q salir"
 
 _FOCUS_ORDER = ("keyboard", "history", "vars")
 
@@ -46,6 +48,7 @@ class App:
         self.error = ""
         self.just_evaluated = False
         self.focus = "keyboard"  # "keyboard" | "history" | "vars"
+        self.show_help = False
         self.pending_confirm: str | None = None
         self._pending_confirm_action: str = "clear_history"
         self._edit_counter = 0
@@ -80,6 +83,7 @@ class App:
         self.vars_panel = VarsPanel(
             self.history_win, self.calc.variables, format_result
         )
+        self.help_panel = HelpPanel(self.history_win)
         self.keyboard = Keyboard(self.keyboard_win)
 
     # ----- loop principal -----
@@ -113,9 +117,14 @@ class App:
                 except (CalcSyntaxError, CalcMathError, ValueError, KeyError):
                     self.result_display = ""
         message = self.pending_confirm or self.error
-        hint = {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
+        if self.show_help:
+            hint = HELP_HINT
+        else:
+            hint = {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
         self.display.render(self.expression, self.result_display, message, hint)
-        if self.focus == "vars":
+        if self.show_help:
+            self.help_panel.render()
+        elif self.focus == "vars":
             self.vars_panel.render()
         else:
             self.history_panel.render()
@@ -133,11 +142,21 @@ class App:
             self._process_confirm(ch)
             return False
 
+        if self.show_help:  # modal: solo cierra o sale
+            if ch in (ord("?"), 27):
+                self.show_help = False
+            elif ch in (ord("q"), ord("Q")):
+                return True
+            return False
+
         if ch == TAB:
             self._toggle_focus()
             return False
         if ch in (ord("q"), ord("Q")):
             return True
+        if ch == ord("?"):
+            self.show_help = True
+            return False
         if ch == 27:  # ESC: limpiar display
             self._handle_action("clear", "")
             return False

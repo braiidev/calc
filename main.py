@@ -7,7 +7,7 @@ import sys
 
 from tui.app import App
 
-VERSION = "v0.4"
+VERSION = "v0.5"
 
 
 def main() -> int:

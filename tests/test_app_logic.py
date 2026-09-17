@@ -56,6 +56,7 @@ def make_app() -> App:
     app.error = ""
     app.just_evaluated = False
     app.focus = "keyboard"
+    app.show_help = False
     app.pending_confirm = None
     app._pending_confirm_action = "clear_history"
     app._edit_counter = 0
@@ -95,6 +96,30 @@ def test_vars_activate_no_duplica() -> None:
     assert app.expression == "5"
     app._vars_activate()
     assert app.expression == "5"
+
+
+def test_help_abre_y_cierra() -> None:
+    app = make_app()
+    assert app._handle_key(ord("?")) is False
+    assert app.show_help is True
+    assert app._handle_key(ord("?")) is False
+    assert app.show_help is False
+
+
+def test_help_es_modal() -> None:
+    app = make_app()
+    app._handle_key(ord("?"))
+    app._handle_key(ord("5"))  # no debe editar ni cerrar
+    assert app.expression == ""
+    assert app.show_help is True
+    app._handle_key(27)  # ESC cierra
+    assert app.show_help is False
+
+
+def test_help_q_sale() -> None:
+    app = make_app()
+    app.show_help = True
+    assert app._handle_key(ord("q")) is True
 
 
 def test_toggle_focus_ciclo() -> None:

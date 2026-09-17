@@ -1,12 +1,12 @@
 # TODO
 
 ## Doing
-- [ ] v0.5.3 - Leyenda toggleable de operadores/teclas con `?`
-
-## Next
 - [ ] v0.6 - Estética TUI: layout, colores y hints (a definir con el usuario)
 
+## Next
+
 ## Done
+- [x] v0.5.3 - Leyenda toggleable de operadores/teclas con `?`
 - [x] v0.5.2 - Notación semántica en historial (`[floor]`, `[sqrt]`, `[cbrt]`, `[nroot]`)
 - [x] v0.5.1 - `//` división entera, `root(x, n)` raíz n-ésima, fuera `:`
 - [x] v0.4 - Variables: builtins pi/e, asignación `x = 5` y panel de variables
