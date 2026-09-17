@@ -6,6 +6,7 @@
 ## Next
 
 ## Done
+- [x] v0.6.9 - fix: alinear la fila de funciones con el pad del teclado
 - [x] v0.6.8 - Cierre de fase: VERSION v0.6 e install.sh testeado (overrides CALC_DIR/CALC_BIN)
 - [x] v0.6.7 - Teclado por bloques (mockup B) + glifos Unicode con fallback
 - [x] v0.6.6 - Layout adaptativo del medio (D/E/F) + scroll/overflow por panel + divisiones y títulos

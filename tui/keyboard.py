@@ -92,14 +92,12 @@ class Keyboard:
             return
 
         grid_w = _GRID_COLS * _BUTTON_W
-        # El bloque numérico se indenta una celda si hay espacio (mockup).
-        indent = _BUTTON_W if width >= grid_w + _BUTTON_W else 0
-        base = max((width - grid_w - indent) // 2, 0)
+        # Todos los bloques comparten el mismo offset para quedar alineados.
+        x_offset = max((width - grid_w) // 2, 0)
 
         for r, row in enumerate(_KEYS):
             if r >= height:
                 break
-            x_offset = base if r < 2 else base + indent
             for c, key in enumerate(row):
                 if key is None:
                     continue

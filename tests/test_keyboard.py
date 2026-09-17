@@ -8,15 +8,18 @@ class StubWin:
         self.height = height
         self.width = width
         self.lines: list[str] = []
+        self.cells: list[tuple[int, int, str]] = []
 
     def getmaxyx(self) -> tuple[int, int]:
         return self.height, self.width
 
     def erase(self) -> None:
         self.lines = []
+        self.cells = []
 
     def addstr(self, y: int, x: int, text: str, attr: int = 0) -> None:
         self.lines.append(text)
+        self.cells.append((y, x, text))
 
     def noutrefresh(self) -> None:
         pass
@@ -90,3 +93,10 @@ def test_render_fallback_ascii() -> None:
 
 def test_get_all_keys() -> None:
     assert len(Keyboard.get_all_keys()) == 23
+
+
+def test_bloques_alineados_al_mismo_offset() -> None:
+    win = StubWin(6, 80)
+    Keyboard(win, {}).render()  # type: ignore[arg-type]
+    xs = {text: x for _, x, text in win.cells}
+    assert xs["[sqr]"] == xs["[ANS]"]  # funciones y pad comparten offset
