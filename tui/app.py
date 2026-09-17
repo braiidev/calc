@@ -7,19 +7,24 @@ from models.history import History
 from tui.display import Display
 from tui.history_panel import HistoryPanel
 from tui.keyboard import Keyboard, PAIR_NUM, PAIR_OP, PAIR_ACTION
+from tui.vars_panel import VarsPanel
 
 # Código de tecla: backspace puede venir como 127 o 8
 KEY_BACKSPACE = (curses.KEY_BACKSPACE, 127, 8, curses.KEY_DC)
 KEY_ENTER = (10, 13, curses.KEY_ENTER)
 TAB = 9
 SPACE = 32
-INSERTABLE = "0123456789.+-*/()%!:"
+# Caracteres insertables no alfanuméricos (letras = identificadores de variables)
+OPERATOR_LITERALS = "+-*/()%!.:="
 
 DISPLAY_H = 4
 KEYBOARD_H = 5
 
 K_HINT = "teclado  · tab foco · q salir"
 H_HINT = "historial · tab foco · q salir"
+V_HINT = "variables · tab foco · q salir"
+
+_FOCUS_ORDER = ("keyboard", "history", "vars")
 
 
 def format_result(value: float) -> str:
@@ -40,8 +45,9 @@ class App:
         self.result_display = ""
         self.error = ""
         self.just_evaluated = False
-        self.focus = "keyboard"  # "keyboard" | "history"
+        self.focus = "keyboard"  # "keyboard" | "history" | "vars"
         self.pending_confirm: str | None = None
+        self._pending_confirm_action: str = "clear_history"
         self._edit_counter = 0
         self._last_tray: tuple | None = None
         self._last_tray_edit = -1
@@ -71,6 +77,9 @@ class App:
         self.keyboard_win = curses.newwin(height - kb_top, width, kb_top, 0)
         self.display = Display(self.display_win)
         self.history_panel = HistoryPanel(self.history_win, self.history)
+        self.vars_panel = VarsPanel(
+            self.history_win, self.calc.variables, format_result
+        )
         self.keyboard = Keyboard(self.keyboard_win)
 
     # ----- loop principal -----
@@ -92,15 +101,24 @@ class App:
     # ----- render -----
 
     def _render(self) -> None:
+        # No previsualizar asignaciones (ejecutan sobre el almacén) ni `=`
         if not self.error and not self.pending_confirm:
-            try:
-                self.result_display = format_result(self.calc.evaluate(self.expression))
-            except (CalcSyntaxError, CalcMathError, ValueError, KeyError):
+            if "=" in self.expression:
                 self.result_display = ""
+            else:
+                try:
+                    self.result_display = format_result(
+                        self.calc.evaluate(self.expression)
+                    )
+                except (CalcSyntaxError, CalcMathError, ValueError, KeyError):
+                    self.result_display = ""
         message = self.pending_confirm or self.error
-        hint = H_HINT if self.focus == "history" else K_HINT
+        hint = {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
         self.display.render(self.expression, self.result_display, message, hint)
-        self.history_panel.render()
+        if self.focus == "vars":
+            self.vars_panel.render()
+        else:
+            self.history_panel.render()
         last = self.expression[-1] if self.expression else None
         suffix = self.expression[-2:] if len(self.expression) >= 2 else ""
         highlight = suffix if suffix in ("**", "//") else last
@@ -128,12 +146,16 @@ class App:
         if ch in KEY_ENTER:
             if self.focus == "history":
                 self._history_activate()
+            elif self.focus == "vars":
+                self._vars_activate()
             else:
                 self._handle_action("eval", "")
             return False
         if ch == SPACE:
             if self.focus == "history":
                 self._history_activate()
+            elif self.focus == "vars":
+                self._vars_activate()
             else:
                 action, char = self.keyboard.focused_action()
                 self._handle_action(action, char)
@@ -143,13 +165,18 @@ class App:
         if self.focus == "history":
             if self._handle_history_key(ch):
                 return False
+        elif self.focus == "vars":
+            if self._handle_vars_key(ch):
+                return False
         else:
             if self._handle_keyboard_key(ch):
                 return False
 
-        # Insertable: dígitos y operadores en ambos focos
-        if 32 < ch <= 126 and chr(ch) in INSERTABLE:
-            self._insert(chr(ch))
+        # Insertable: dígitos, operadores y letras (identificadores) en ambos focos
+        if 32 < ch <= 126:
+            c = chr(ch)
+            if c.isalnum() or c in OPERATOR_LITERALS:
+                self._insert(c)
         return False
 
     def _handle_keyboard_key(self, ch: int) -> bool:
@@ -186,20 +213,53 @@ class App:
             self.history_panel.delete_selected()
         elif ch in (ord("x"), ord("X")):
             if len(self.history):
-                self.pending_confirm = "¿Borrar todo el historial? (y/N)"
+                self._ask_confirm("¿Borrar todo el historial? (y/N)", "clear_history")
         else:
             return False
         return True
 
+    def _handle_vars_key(self, ch: int) -> bool:
+        """Teclas del foco variables. Retorna True si se consumieron."""
+        if ch in (ord("j"), curses.KEY_DOWN):
+            self.vars_panel.move(1)
+        elif ch in (ord("k"), curses.KEY_UP):
+            self.vars_panel.move(-1)
+        elif ch == ord("h"):
+            self.vars_panel.to_first()
+        elif ch == ord("l"):
+            self.vars_panel.to_last()
+        elif ch in (ord("d"), ord("D")):
+            self.vars_panel.delete_selected()
+        elif ch in (ord("x"), ord("X")):
+            user_vars = len(self.calc.variables.list_vars()) - len(
+                self.calc.variables.BUILTINS
+            )
+            if user_vars:
+                self._ask_confirm(
+                    "¿Borrar todas las variables de usuario? (y/N)", "clear_vars"
+                )
+        else:
+            return False
+        return True
+
+    def _ask_confirm(self, message: str, action: str) -> None:
+        self.pending_confirm = message
+        self._pending_confirm_action = action
+
     def _process_confirm(self, ch: int) -> None:
-        """Manejar la confirmación de borrar historial."""
+        """Manejar la confirmación de borrado (historial o variables)."""
         if ch in (ord("y"), ord("Y")):
-            self.history.clear()
-            self.history_panel.reset_selection()
+            if self._pending_confirm_action == "clear_vars":
+                self.calc.variables.clear()
+                self.vars_panel.reset_selection()
+            else:
+                self.history.clear()
+                self.history_panel.reset_selection()
         self.pending_confirm = None  # cualquier otra tecla cancela
 
     def _toggle_focus(self) -> None:
-        self.focus = "history" if self.focus == "keyboard" else "keyboard"
+        idx = _FOCUS_ORDER.index(self.focus)
+        self.focus = _FOCUS_ORDER[(idx + 1) % len(_FOCUS_ORDER)]
 
     def _history_activate(self) -> None:
         """Traer el resultado de la entrada seleccionada a la bandeja (display).
@@ -218,6 +278,20 @@ class App:
             return
         self._tray_activate_value(entry[1])
         self._last_tray = ("history", entry[2])
+        self._last_tray_edit = self._edit_counter
+
+    def _vars_activate(self) -> None:
+        """Traer el valor de la variable seleccionada a la bandeja."""
+        var = self.vars_panel.selected_var()
+        if var is None:
+            return
+        if (
+            self._last_tray == ("vars", var[0])
+            and self._edit_counter == self._last_tray_edit
+        ):
+            return
+        self._tray_activate_value(format_result(var[1]))
+        self._last_tray = ("vars", var[0])
         self._last_tray_edit = self._edit_counter
 
     def _tray_activate_value(self, value: str) -> None:
@@ -258,12 +332,15 @@ class App:
             self.error = ""
             self._edit_counter += 1
         elif action == "eval":
-            if self.expression.strip() == "":
+            expr = self.expression.strip()
+            if expr.endswith("="):  # '=' tecleado como carácter de una asignación
+                expr = expr[:-1].strip()
+            if expr == "":
                 return
             try:
-                value = self.calc.evaluate(self.expression)
+                value = self.calc.evaluate(expr)
                 formatted = format_result(value)
-                self.history.add(self.expression, formatted)
+                self.history.add(expr, formatted)
                 self.history_panel.reset_selection()
                 self.result_display = formatted
                 self.error = ""

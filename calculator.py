@@ -5,12 +5,15 @@ Operadores soportados:
 - División entera: `:` (5:2 = 2)
 - Científica: ** (potencia), // (raíz n-ésima: 8//3 = 2), % (módulo),
   ! (factorial), sqrt() (raíz cuadrada)
+- Variables (v0.4): pi, e (builtin) y asignación `x = 5` para uso posterior
 """
 
 import math
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
+
+from models.variables import Variables
 
 
 class TokType(Enum):
@@ -24,6 +27,7 @@ class TokType(Enum):
     MOD = auto()
     POW = auto()
     FACT = auto()
+    ASSIGN = auto()
     IDENT = auto()
     LPAREN = auto()
     RPAREN = auto()
@@ -58,6 +62,11 @@ class NumberNode(Node):
 
 
 @dataclass
+class VarNode(Node):
+    name: str
+
+
+@dataclass
 class BinOpNode(Node):
     left: Node
     op: str
@@ -70,6 +79,12 @@ class UnaryOpNode(Node):
     child: Node
 
 
+@dataclass
+class AssignNode(Node):
+    name: str
+    value: Node
+
+
 # ---------------- Lexer ----------------
 
 _SINGLE_CHAR: dict[str, TokType] = {
@@ -80,6 +95,7 @@ _SINGLE_CHAR: dict[str, TokType] = {
     ":": TokType.FLDIV,
     "%": TokType.MOD,
     "!": TokType.FACT,
+    "=": TokType.ASSIGN,
     "(": TokType.LPAREN,
     ")": TokType.RPAREN,
 }
@@ -141,12 +157,13 @@ _FUNCTIONS = {"sqrt"}
 class Parser:
     """Parser por descenso recursivo. Precedencia (de menor a mayor):
 
+    assign  := IDENT '=' assign | expr
     expr    := term (('+' | '-') term)*
     term    := unary (('*' | '/' | ':' | '//' | '%') unary)*
     unary   := '-' unary | power
     power   := postfix ('**' unary)?            # asociativa a la derecha
     postfix := primary ('!')*
-    primary := NUMBER | '(' expr ')' | IDENT '(' expr ')'
+    primary := NUMBER | IDENT | '(' expr ')' | IDENT '(' expr ')'
     """
 
     _TERM_OPS = {
@@ -164,7 +181,7 @@ class Parser:
     def parse(self) -> Node:
         if self._current().type == TokType.EOF:
             raise CalcSyntaxError("Expresión vacía")
-        node = self._parse_expr()
+        node = self._parse_assign()
         if self._current().type != TokType.EOF:
             raise CalcSyntaxError(f"Token inesperado: '{self._current().lexeme}'")
         return node
@@ -190,7 +207,21 @@ class Parser:
             raise CalcSyntaxError(f"Se esperaba '{_LABELS.get(ttype, ttype.name)}'")
         return token
 
+    def _peek(self, offset: int = 1) -> Optional[TokType]:
+        """Tipo del token en `offset` posiciones desde el actual."""
+        pos = self._pos + offset
+        if pos >= len(self._tokens):
+            return None
+        return self._tokens[pos].type
+
     # ------- reglas -------
+
+    def _parse_assign(self) -> Node:
+        if self._current().type == TokType.IDENT and self._peek() == TokType.ASSIGN:
+            name = self._advance().lexeme
+            self._expect(TokType.ASSIGN)
+            return AssignNode(name, self._parse_assign())
+        return self._parse_expr()
 
     def _parse_expr(self) -> Node:
         node = self._parse_term()
@@ -236,12 +267,12 @@ class Parser:
             return NumberNode(token.value)
         if token.type == TokType.IDENT:
             self._advance()
-            if token.lexeme not in _FUNCTIONS:
-                raise CalcSyntaxError(f"Función desconocida: '{token.lexeme}'")
-            self._expect(TokType.LPAREN)
-            arg = self._parse_expr()
-            self._expect(TokType.RPAREN)
-            return UnaryOpNode(token.lexeme, arg)
+            if token.lexeme in _FUNCTIONS:
+                self._expect(TokType.LPAREN)
+                arg = self._parse_expr()
+                self._expect(TokType.RPAREN)
+                return UnaryOpNode(token.lexeme, arg)
+            return VarNode(token.lexeme)
         if token.type == TokType.LPAREN:
             self._advance()
             node = self._parse_expr()
@@ -263,6 +294,7 @@ _LABELS: dict[TokType, str] = {
     TokType.MOD: "%",
     TokType.POW: "**",
     TokType.FACT: "!",
+    TokType.ASSIGN: "=",
     TokType.IDENT: "identificador",
     TokType.LPAREN: "(",
     TokType.RPAREN: ")",
@@ -274,12 +306,23 @@ _LABELS: dict[TokType, str] = {
 _FACTORIAL_MAX = 1000
 
 
-def evaluate_ast(node: Node) -> float:
-    """Evaluar el árbol sintáctico abstracto."""
+def evaluate_ast(node: Node, variables: Optional[Variables] = None) -> float:
+    """Evaluar el árbol sintáctico abstracto.
+
+    `variables` se actualiza con las asignaciones (`x = 5`) encontradas.
+    """
+    if variables is None:
+        variables = Variables()
     if isinstance(node, NumberNode):
         return node.value
+    if isinstance(node, VarNode):
+        return _lookup_var(variables, node.name)
+    if isinstance(node, AssignNode):
+        value = evaluate_ast(node.value, variables)
+        _set_var(variables, node.name, value)
+        return value
     if isinstance(node, UnaryOpNode):
-        value = evaluate_ast(node.child)
+        value = evaluate_ast(node.child, variables)
         if node.op == "-":
             return -value
         if node.op == "!":
@@ -288,10 +331,24 @@ def evaluate_ast(node: Node) -> float:
             return _sqrt(value)
         raise CalcMathError(f"Operador desconocido: '{node.op}'")
     if isinstance(node, BinOpNode):
-        left = evaluate_ast(node.left)
-        right = evaluate_ast(node.right)
+        left = evaluate_ast(node.left, variables)
+        right = evaluate_ast(node.right, variables)
         return _apply_binop(node.op, left, right)
     raise CalcSyntaxError("Nodo desconocido en el árbol de expresión")
+
+
+def _lookup_var(variables: Variables, name: str) -> float:
+    value = variables.get(name)
+    if value is None:
+        raise CalcSyntaxError(f"Variable indefinida: '{name}'")
+    return value
+
+
+def _set_var(variables: Variables, name: str, value: float) -> None:
+    try:
+        variables.set(name, value)
+    except ValueError as exc:
+        raise CalcMathError(str(exc))
 
 
 def _apply_binop(op: str, left: float, right: float) -> float:
@@ -364,7 +421,7 @@ def _sqrt(value: float) -> float:
 
 
 class Calculator:
-    """Calculadora con parser propio.
+    """Calculadora con parser propio y almacén de variables.
 
     Uso:
         calc = Calculator()
@@ -372,13 +429,15 @@ class Calculator:
         result = calc.evaluate("2 ** 3 !")     # 64.0
         result = calc.evaluate("8//3")         # 2.0  (raíz cúbica)
         result = calc.evaluate("5:2")          # 2.0  (división entera)
+        result = calc.evaluate("x = 5")        # 5.0  (asigna y devuelve)
+        result = calc.evaluate("x * 2")        # 10.0 (usa la variable)
     """
 
     def __init__(self) -> None:
-        pass
+        self.variables = Variables()
 
     def evaluate(self, expr: str) -> float:
         tokens = tokenize(expr)
         parser = Parser(tokens)
         ast = parser.parse()
-        return evaluate_ast(ast)
+        return evaluate_ast(ast, self.variables)

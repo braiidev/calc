@@ -1,4 +1,4 @@
-"""Tests del motor de cálculo: aritmética, científica, raíz y división entera."""
+"""Tests del motor de cálculo: aritmética, científica, raíz, división entera y variables."""
 
 import pytest
 
@@ -70,6 +70,28 @@ def test_division_entera(calc: Calculator, expr: str, expected: float) -> None:
 def test_division_entera_requiere_enteros(calc: Calculator) -> None:
     with pytest.raises(CalcMathError):
         calc.evaluate("5.5:2")
+
+
+def test_variables_builtin(calc: Calculator) -> None:
+    assert calc.evaluate("pi") == pytest.approx(3.141592653589793)
+    assert calc.evaluate("e") == pytest.approx(2.718281828459045)
+
+
+def test_asignacion_y_uso(calc: Calculator) -> None:
+    assert calc.evaluate("x = 5") == 5.0
+    assert calc.evaluate("x * 2") == 10.0
+    assert calc.evaluate("x = y = 3") == 3.0
+    assert calc.evaluate("x + y") == 6.0
+
+
+def test_no_sobreescribir_builtin(calc: Calculator) -> None:
+    with pytest.raises(CalcMathError, match="builtin"):
+        calc.evaluate("pi = 3")
+
+
+def test_variable_indefinida(calc: Calculator) -> None:
+    with pytest.raises(CalcSyntaxError, match="Variable indefinida"):
+        calc.evaluate("zzz + 1")
 
 
 def test_errores_sintaxis_siguen_siendo_errores(calc: Calculator) -> None:
