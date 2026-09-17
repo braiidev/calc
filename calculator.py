@@ -181,7 +181,7 @@ class Parser:
     def _expect(self, ttype: TokType) -> Token:
         token = self._match(ttype)
         if token is None:
-            raise CalcSyntaxError(f"Se esperaba '{_LABELS[ttype]}'")
+            raise CalcSyntaxError(f"Se esperaba '{_LABELS.get(ttype, ttype.name)}'")
         return token
 
     # ------- reglas -------
@@ -245,8 +245,18 @@ class Parser:
 
 
 _LABELS: dict[TokType, str] = {
+    TokType.NUMBER: "número",
+    TokType.PLUS: "+",
+    TokType.MINUS: "-",
+    TokType.MULT: "*",
+    TokType.DIV: "/",
+    TokType.FLDIV: "//",
+    TokType.MOD: "%",
+    TokType.POW: "**",
+    TokType.FACT: "!",
+    TokType.IDENT: "identificador",
+    TokType.LPAREN: "(",
     TokType.RPAREN: ")",
-    TokType.EOF: "fin de expresión",
 }
 
 

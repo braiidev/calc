@@ -194,11 +194,23 @@ class App:
         self.focus = "history" if self.focus == "keyboard" else "keyboard"
 
     def _history_activate(self) -> None:
-        """Poner el resultado de la entrada seleccionada en la bandeja (display)."""
+        """Poner el resultado de la entrada seleccionada en la bandeja (display).
+
+        Se concatena al final de la expresión actual para permitir continuar,
+        p. ej. `5*` + traer resultado B -> `5*3`.
+        """
         entry = self.history_panel.selected_entry()
         if entry is None:
             return
-        self.expression = entry[1]  # resultado como base de la expresión
+        value = entry[1]
+        if self.just_evaluated or not self.expression:
+            self.expression = value  # nueva bandeja: empieza limpio
+        else:
+            last = self.expression[-1]
+            if last.isdigit() or last == ")":
+                self.expression += "*" + value  # evitar pegar números (5 + 3 -> 5*3)
+            else:
+                self.expression += value
         self.just_evaluated = False
         self.error = ""
 
@@ -234,7 +246,7 @@ class App:
                 self.result_display = formatted
                 self.error = ""
                 self.just_evaluated = True
-            except (CalcSyntaxError, CalcMathError, ValueError) as exc:
+            except (CalcSyntaxError, CalcMathError, ValueError, KeyError) as exc:
                 self.error = str(exc)
         elif action == "ans":
             if self.result_display:
