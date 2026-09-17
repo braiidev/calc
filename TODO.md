@@ -4,8 +4,12 @@
 <!-- vacío -->
 
 ## Next
+- [ ] fix: letras `h j k l c d x` no se pueden tipear (navegación vim consume el insert) - v0.7.2 (a decidir esquema)
 
 ## Done
+- [x] v0.8.3 - install.sh con flags (--update/--upgrade/--reinstall/--uninstall [--purge]/--version/--help)
+- [x] v0.8.2 - Update + reinicio en la app: auto-check en background (CALC_NO_AUTO_UPDATE), tecla U, aviso en la barra de estado
+- [x] v0.8.1 - Ciclo de vida en el CLI: `tui/update.py` + `--update`/`--check-update`/`--reinstall`/`--uninstall [--purge]`
 - [x] v0.7.1 - Las asignaciones (`x = 5`) ya no van al historial; solo a variables
 - [x] v0.7 - Persistencia de variables de usuario en `variables.json` (carga al arrancar, guarda al asignar/borrar)
 - [x] v0.6.9 - fix: alinear la fila de funciones con el pad del teclado
