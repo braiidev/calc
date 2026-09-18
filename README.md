@@ -1,8 +1,8 @@
 # calc
 
-Calculadora TUI en Python (curses), sin dependencias externas. Interfaz de tres
-zonas (display, historial/variables, teclado), temas de color, notación
-semántica y actualización integrada.
+Calculadora TUI en Python (curses), sin dependencias externas. Interfaz de
+cuatro secciones apiladas (historial/variables, display + notación, teclado y
+barra de estado), temas de color, notación semántica y actualización integrada.
 
 ## Requisitos
 

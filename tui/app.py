@@ -43,9 +43,10 @@ OPERATOR_LITERALS = "+-*/()%!.,="
 # uio → 4/5/6, jkl → 1/2/3, m → 0.  (7-9 y el resto ya se insertan directo.)
 HOME_DIGITS = {"u": "4", "i": "5", "o": "6", "j": "1", "k": "2", "l": "3", "m": "0"}
 
-DISPLAY_H = 5
+STATUS_H = 1
+DISPLAY_H = 4
 KEYBOARD_H = 6
-MIN_ROWS = DISPLAY_H + KEYBOARD_H + 2  # mínimo: display + historial + teclado
+MIN_ROWS = STATUS_H + DISPLAY_H + KEYBOARD_H + 2  # mínimo: secciones + historial
 MIN_COLS = 30  # ancho mínimo del grid del teclado (6 * 5)
 
 # Layout del panel central:
@@ -147,27 +148,31 @@ class App:
             self.vars_win = None
             self.keyboard_win = None
             self.help_win = None
+            self.status_win = None
             return
         self.mid_layout = self._pick_mid_layout(height, width)
-        kb_top = height - KEYBOARD_H
-        mid_h = kb_top - DISPLAY_H
+        status_top = height - STATUS_H
+        kb_top = status_top - KEYBOARD_H
+        display_top = kb_top - DISPLAY_H
+        mid_h = display_top
         bordered = self.theme.style == "boxed"
         glyphs = self.theme.glyphs
 
-        self.display_win = curses.newwin(DISPLAY_H, width, 0, 0)
+        self.display_win = curses.newwin(DISPLAY_H, width, display_top, 0)
         self.keyboard_win = curses.newwin(KEYBOARD_H, width, kb_top, 0)
-        self.help_win = curses.newwin(mid_h, width, DISPLAY_H, 0)
+        self.status_win = curses.newwin(STATUS_H, width, status_top, 0)
+        self.help_win = curses.newwin(mid_h, width, 0, 0)
         if self.mid_layout == "D":
             left_w = width // 2
-            self.history_win = curses.newwin(mid_h, left_w, DISPLAY_H, 0)
-            self.vars_win = curses.newwin(mid_h, width - left_w, DISPLAY_H, left_w)
+            self.history_win = curses.newwin(mid_h, left_w, 0, 0)
+            self.vars_win = curses.newwin(mid_h, width - left_w, 0, left_w)
         elif self.mid_layout == "E":
             hist_h = mid_h // 2
-            self.history_win = curses.newwin(hist_h, width, DISPLAY_H, 0)
-            self.vars_win = curses.newwin(mid_h - hist_h, width, DISPLAY_H + hist_h, 0)
+            self.history_win = curses.newwin(hist_h, width, 0, 0)
+            self.vars_win = curses.newwin(mid_h - hist_h, width, hist_h, 0)
         else:  # F: ambos paneles ocupan el medio, se muestra el del foco
-            self.history_win = curses.newwin(mid_h, width, DISPLAY_H, 0)
-            self.vars_win = curses.newwin(mid_h, width, DISPLAY_H, 0)
+            self.history_win = curses.newwin(mid_h, width, 0, 0)
+            self.vars_win = curses.newwin(mid_h, width, 0, 0)
 
         self.display = Display(self.display_win, self.attrs, glyphs)
         self.history_panel = HistoryPanel(
@@ -247,9 +252,8 @@ class App:
             notation = self.calc.notation(self.expression)
         message = self.pending_confirm or self.error or self._update_message
         hint = self._status_text()
-        self.display.render(
-            self.expression, self.result_display, message, hint, notation
-        )
+        self.display.render(self.expression, self.result_display, message, notation)
+        self._render_status(hint)
         if self.show_help:
             self.help_panel.render()
         elif self.mid_layout == "F":
@@ -288,6 +292,21 @@ class App:
                 pass
         self.stdscr.noutrefresh()
         curses.doupdate()
+
+    def _render_status(self, text: str) -> None:
+        """Barra de estado fija al borde inferior (sección 4)."""
+        if self.status_win is None:
+            return
+        height, width = self.status_win.getmaxyx()
+        self.status_win.erase()
+        if height >= 1 and width > 1:
+            try:
+                self.status_win.addstr(
+                    0, 1, text[: max(width - 2, 0)], self.attrs.get("hint", 0)
+                )
+            except curses.error:
+                pass
+        self.status_win.noutrefresh()
 
     _MODE_LABEL = {"keyboard": "teclado", "history": "historial", "vars": "variables"}
     _NEXT_FOCUS = {"keyboard": "historial", "history": "variables", "vars": "teclado"}

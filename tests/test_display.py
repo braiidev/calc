@@ -37,9 +37,9 @@ def _text(win: StubWin) -> str:
 
 
 def test_render_muestra_prompt_notacion_y_resultado() -> None:
-    win = StubWin(5, 40)
+    win = StubWin(4, 40)
     Display(win, {}, _GLYPHS).render(  # type: ignore[arg-type]
-        "9 // 4", "2", hint="› teclado", notation="[floor]"
+        "9 // 4", "2", notation="[floor]"
     )
     text = _text(win)
     assert "› 9 // 4" in text
@@ -49,7 +49,7 @@ def test_render_muestra_prompt_notacion_y_resultado() -> None:
 
 
 def test_render_error() -> None:
-    win = StubWin(5, 40)
+    win = StubWin(4, 40)
     Display(win, {}, _GLYPHS).render(  # type: ignore[arg-type]
         "1/0", "", error="División por cero"
     )
@@ -61,18 +61,18 @@ def _reversed(win: StubWin) -> list[str]:
 
 
 def test_render_cursor_marca_caracter() -> None:
-    win = StubWin(5, 40)
+    win = StubWin(4, 40)
     Display(win, {}, _GLYPHS).render("ab", "", cursor=1)  # type: ignore[arg-type]
     assert _reversed(win) == ["b"]
 
 
 def test_render_cursor_al_final_marca_espacio() -> None:
-    win = StubWin(5, 40)
+    win = StubWin(4, 40)
     Display(win, {}, _GLYPHS).render("ab", "", cursor=2)  # type: ignore[arg-type]
     assert _reversed(win) == [" "]
 
 
 def test_render_sin_cursor_no_marca() -> None:
-    win = StubWin(5, 40)
+    win = StubWin(4, 40)
     Display(win, {}, _GLYPHS).render("ab", "")  # type: ignore[arg-type]
     assert _reversed(win) == []

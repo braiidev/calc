@@ -6,6 +6,7 @@
 ## Next
 
 ## Done
+- [x] v0.9.13 style: layout de 4 secciones apiladas (historial/variables, display + notación, teclado, statusbar) — sin overlap, resize-safe, min límites
 - [x] v0.9.12 fix: insertar `.` directo (faltaba en OPERATOR_LITERALS)
 - [x] v0.9.11 feat: remapeo funcional — WASD/nav, capa homerow (uio/jkl/m), x/X universal, g/G extremos, h toggle hints (+ ayuda/README)
 - [x] v0.9.10 style: separación visual de secciones (display con divisor, teclado con barra y grid compacto)

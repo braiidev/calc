@@ -234,6 +234,43 @@ class StubStd:
         return self._size
 
 
+def test_render_status_escribe_en_la_barra_del_fondo() -> None:
+    import tui.app as app_module
+
+    class BarWin:
+        def __init__(self, height: int, width: int, top: int, left: int) -> None:
+            self._size = (height, width, top, left)
+            self.writes: list[tuple[int, int, str, int]] = []
+
+        def getmaxyx(self) -> tuple[int, int]:
+            return self._size[0], self._size[1]
+
+        def erase(self) -> None:
+            self.writes = []
+
+        def addstr(self, y: int, x: int, text: str, attr: int) -> None:
+            self.writes.append((y, x, text, attr))
+
+        def noutrefresh(self) -> None:
+            pass
+
+    bar = BarWin(1, 80, 23, 0)
+    app = object.__new__(App)
+    app.status_win = bar  # type: ignore[attr-defined]
+    app.attrs = {"hint": 2}
+    app._render_status("teclado · tab historial · e editar · ? ayuda · q salir")
+    assert bar.writes == [
+        (0, 1, "teclado · tab historial · e editar · ? ayuda · q salir", 2)
+    ]
+
+
+def test_render_status_vacio_o_sin_barra_no_escribe() -> None:
+    app = object.__new__(App)
+    app.status_win = None  # type: ignore[attr-defined]
+    app._render_status("")
+    assert True
+
+
 def test_on_resize_no_llama_resizeterm(monkeypatch) -> None:
     import tui.app as app_module
 
@@ -272,6 +309,7 @@ def test_make_windows_too_small_no_crea_ventanas() -> None:
     app._make_windows()
     assert app.too_small is True
     assert app.display_win is None
+    assert app.status_win is None
 
 
 def test_make_windows_size_ok(monkeypatch) -> None:
@@ -294,8 +332,38 @@ def test_make_windows_size_ok(monkeypatch) -> None:
     app._make_windows()
     assert app.too_small is False
     assert app.display_win is not None
+    assert app.status_win is not None
     assert app.mid_layout == "D"  # 80 >= 70: historial | variables
     assert app.vars_win is not None
+
+
+def test_make_windows_secciones_no_se_pisan(monkeypatch) -> None:
+    import tui.app as app_module
+
+    class FakeWin:
+        def __init__(self, height: int, width: int, top: int, left: int) -> None:
+            self._size = (height, width, top, left)
+
+        def getmaxyx(self) -> tuple[int, int]:
+            return self._size[0], self._size[1]
+
+    monkeypatch.setattr(app_module.curses, "newwin", FakeWin)
+    app = object.__new__(App)
+    app.stdscr = StubStd(24, 80)  # type: ignore[assignment]
+    app.calc = Calculator()
+    app.history = History()
+    app.config = {}
+    app._use_color = False
+    app._make_windows()
+    status_h, status_w, status_top, status_left = app.status_win._size  # type: ignore[attr-defined]
+    kb_h, kb_w, kb_top, kb_left = app.keyboard_win._size  # type: ignore[attr-defined]
+    disp_h, disp_w, disp_top, disp_left = app.display_win._size  # type: ignore[attr-defined]
+    hist_h, hist_w, hist_top, hist_left = app.history_win._size  # type: ignore[attr-defined]
+    assert (status_h, status_w, status_top, status_left) == (1, 80, 23, 0)
+    assert kb_top == status_top - kb_h  # teclado pegado sobre la statusbar
+    assert disp_top == kb_top - disp_h  # display pegado sobre el teclado
+    assert (disp_top, disp_h) == (hist_h, app_module.DISPLAY_H)  # historial arriba
+    assert hist_top == 0
 
 
 def test_pick_mid_layout() -> None:

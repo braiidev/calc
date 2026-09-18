@@ -7,7 +7,7 @@ _FALLBACK_GLYPHS = {"prompt": ">", "h": "-", "warn": "!"}
 
 
 class Display:
-    """Zona superior: barra de estado, expresión, resultado y errores."""
+    """Sección 2 del layout: divisor, expresión, separador, notación + resultado."""
 
     def __init__(
         self,
@@ -30,41 +30,31 @@ class Display:
         expression: str,
         result: str,
         error: str = "",
-        hint: str = "",
         notation: str = "",
         cursor: Optional[int] = None,
     ) -> None:
         height, width = self.win.getmaxyx()
         self.win.erase()
 
-        # Barra de estado (fila 0)
-        self._draw_left_aligned(
-            self.win,
-            0,
-            hint if hint else "q salir · esc limpiar",
-            width,
-            attr=self._attr("hint"),
-        )
-
-        # Divisor: separa la barra de estado del display (fila 1)
-        if height >= 2:
+        # Divisor: separa la sección display de historial/variables (fila 0)
+        if height >= 1:
             try:
-                self.win.addstr(1, 0, self._glyph("h") * width, self._attr("separator"))
+                self.win.addstr(0, 0, self._glyph("h") * width, self._attr("separator"))
             except curses.error:
                 pass
 
-        # Expresión (fila 2, alineada a la derecha, con cursor opcional)
-        self._draw_expression(expression, width, cursor, row=2)
+        # Expresión (fila 1, alineada a la derecha, con cursor opcional)
+        self._draw_expression(expression, width, cursor, row=1)
 
-        # Separador (fila 3)
+        # Separador (fila 2)
+        if height >= 3:
+            try:
+                self.win.addstr(2, 0, self._glyph("h") * width, self._attr("separator"))
+            except curses.error:
+                pass
+
+        # Notación (dim, a la izquierda) y resultado/error (derecha), fila 3
         if height >= 4:
-            try:
-                self.win.addstr(3, 0, self._glyph("h") * width, self._attr("separator"))
-            except curses.error:
-                pass
-
-        # Notación (dim, a la izquierda) y resultado/error (derecha), fila 4
-        if height >= 5:
             if notation:
                 self._draw_left_aligned(
                     self.win, 3, notation, width, attr=self._attr("hint")
