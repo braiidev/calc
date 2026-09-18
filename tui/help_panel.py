@@ -13,6 +13,7 @@ _HELP_LINES = [
     "",
     "NOTACIÓN   [floor] div. entera · [sqrt] · [cbrt] · [nroot]",
     "VARIABLES  pi, e (constantes) · x = 5 (asignar)",
+    "FUNCIONES  f(a, b) = expr define (e, texto libre) · f(1, 2) la usa",
     "",
     "TECLAS",
     "  mover: w a s d o flechas (teclado, historial, variables y ayuda)",
@@ -75,6 +76,6 @@ class HelpPanel:
             up = self.offset > 0
             down = self.offset + visible < len(_HELP_LINES)
             arrow = "↕" if up and down else ("↑" if up else "↓")
-            more = f" {arrow}  j/k desplazar "
+            more = f" {arrow}  w/s desplazar "
             self.win.addstr(height - 1, 0, more.ljust(max_len), self._attr("title"))
         self.win.noutrefresh()

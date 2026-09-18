@@ -62,11 +62,12 @@ directo; las demás letras son comandos):
 | `?` | ayuda (`w`/`s` o flechas para desplazar, `?`/`esc` cierra) |
 | `q` | salir |
 
-Modo edición (`e`): todo carácter imprimible se inserta (sin espacios).
+Modo edición (`e`): todo carácter imprimible se inserta, espacio incluido
+(necesario para `f(a, b) = expr`).
 
 | Tecla | Acción |
 |-------|--------|
-| `enter` / `space` | evaluar/guardar y salir del modo edición |
+| `enter` | evaluar/guardar y salir del modo edición |
 | `esc` | salir sin evaluar |
 | `←` / `→` | mover el cursor |
 | `home` / `end` (o `ctrl-a` / `ctrl-e`) | inicio / fin |
@@ -87,10 +88,30 @@ edición: en modo normal `w a s d` y `u i o j k l m` son atajos.
 La notación semántica aparece en el historial: `[floor]`, `[sqrt]`, `[cbrt]`,
 `[nroot]`.
 
+### Funciones propias
+
+Definís tu propia función con la misma sintaxis de asignación (en modo edición
+`e`):
+
+```
+regla3(a, b, c) = b*c/a        # definición
+regla3(10, 48, 5)              # uso (24.0)
+```
+
+- Los parámetros son locales y no se pueden nombrar `pi`, `e`, `sqrt` ni `root`
+  (reservados, tampoco como nombre de función).
+- El cuerpo puede usar variables, constantes y otras funciones (composición).
+- Las funciones se listan en el panel `VARS / FUNC`; `space`/`enter` inserta
+  `regla3(` para completar los argumentos y `x` la elimina.
+- Recursión con límite de profundidad (evita colgarse).
+- Se guardan en `functions.json` y se restauran al arrancar.
+
 ## Variables e historial
 
 - Al asignar (`x = 5`) el valor se guarda en `variables.json` (escritura
   atómica). Las asignaciones **no** van al historial.
+- Las funciones propias (`f(a, b) = expr`) viven en `functions.json` y
+  tampoco van al historial.
 - El historial se guarda en `history.json` (máximo 20 entradas) y se restaura
   al arrancar.
 - Datos en `~/.config/calc/` junto al config.

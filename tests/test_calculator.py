@@ -128,3 +128,97 @@ def test_errores_sintaxis_siguen_siendo_errores(calc: Calculator) -> None:
         calc.evaluate("2(")
     with pytest.raises(CalcSyntaxError):
         calc.evaluate("sqrt")  # falta '('
+
+
+# ---------------- funciones de usuario ----------------
+
+
+def test_define_y_usa_funcion(calc: Calculator) -> None:
+    assert calc.define("regla3(a,b,c) = b*c/a") == "regla3"
+    assert calc.evaluate("regla3(10, 48, 5)") == pytest.approx(24.0)
+
+
+def test_define_no_es_evaluacion(calc: Calculator) -> None:
+    assert calc.define("2 + 2") is None
+    assert calc.define("x = 5") is None
+
+
+def test_is_definition(calc: Calculator) -> None:
+    assert calc.is_definition("f(x) = x * 2")
+    assert not calc.is_definition("f(x) * 2")
+    assert not calc.is_definition("2 + 2")
+
+
+def test_funcion_en_expresion(calc: Calculator) -> None:
+    calc.define("regla3(a,b,c) = b*c/a")
+    assert calc.evaluate("regla3(100, 20, 4) * 2") == pytest.approx(1.6)
+
+
+def test_funcion_usa_variables_y_constantes(calc: Calculator) -> None:
+    calc.evaluate("x = 2")
+    calc.define("doble(z) = z * x")
+    assert calc.evaluate("doble(5)") == pytest.approx(10.0)
+
+
+def test_funcion_compone_otras_funciones(calc: Calculator) -> None:
+    calc.define("regla3(a,b,c) = b*c/a")
+    calc.define("iva(m) = regla3(100, m, 121)")
+    assert calc.evaluate("iva(1000)") == pytest.approx(1210.0)
+
+
+def test_redefinir_funcion(calc: Calculator) -> None:
+    calc.define("f(x) = x + 1")
+    assert calc.evaluate("f(1)") == pytest.approx(2.0)
+    calc.define("f(x) = x * 10")
+    assert calc.evaluate("f(1)") == pytest.approx(10.0)
+
+
+def test_reservados_no_redefinibles(calc: Calculator) -> None:
+    for name in ("sqrt", "root", "pi", "e"):
+        with pytest.raises(CalcSyntaxError, match="redefinir"):
+            calc.define(f"{name}(x) = x")
+    with pytest.raises(CalcSyntaxError, match="reservado"):
+        calc.define("f(pi) = pi")
+    with pytest.raises(CalcSyntaxError, match="duplicado"):
+        calc.define("f(x,x) = x")
+
+
+def test_aridad_incorrecta(calc: Calculator) -> None:
+    calc.define("regla3(a,b,c) = b*c/a")
+    with pytest.raises(CalcMathError, match="3 argumento"):
+        calc.evaluate("regla3(1, 2)")
+
+
+def test_recursion_con_limite(calc: Calculator) -> None:
+    calc.define("loop(n) = loop(n + 1)")
+    with pytest.raises(CalcMathError, match="Recursi"):
+        calc.evaluate("loop(0)")
+
+
+def test_funcion_desconocida(calc: Calculator) -> None:
+    with pytest.raises(CalcMathError, match="desconocida"):
+        calc.evaluate("nope(3)")
+
+
+def test_persistencia_roundtrip(calc: Calculator) -> None:
+    calc.define("regla3(a,b,c) = b*c/a")
+    data = calc.functions.user_functions()
+    assert data == [{"name": "regla3", "params": ["a", "b", "c"], "body": "b*c/a"}]
+    otro = Calculator()
+    otro.functions.load_user_functions(data)
+    assert otro.evaluate("regla3(10, 48, 5)") == pytest.approx(24.0)
+
+
+def test_load_ignora_invalidos() -> None:
+    from models.functions import Functions
+
+    store = Functions()
+    store.load_user_functions(
+        [
+            {"name": "ok", "params": ["x"], "body": "x * 2"},
+            {"name": "bad", "params": ["x"], "body": "x +"},  # cuerpo inválido
+            {"name": "sqrt", "params": ["x"], "body": "x"},
+            "basura",  # type: ignore[list-item]
+        ]
+    )
+    assert [f.signature() for f in store.list_functions()] == ["ok(x)"]

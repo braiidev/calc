@@ -10,6 +10,20 @@ from tui.keyboard import Keyboard
 from tui.theme import resolve_theme
 
 
+from dataclasses import dataclass
+
+
+@dataclass
+class StubEntry:
+    """Entrada mínima (variable o función) para los stubs de panel."""
+
+    kind: str
+    name: str
+    action: str
+    display: str
+    target: str
+
+
 class StubHistoryPanel:
     def __init__(self, history: History) -> None:
         self.history = history
@@ -57,23 +71,32 @@ class StubHistoryPanel:
 class StubVarsPanel:
     def __init__(self, variables) -> None:
         self.variables = variables
+        self.functions = None
         self.selected = -1
 
-    def selected_var(self):
+    def _entry(self, idx: int) -> StubEntry | None:
+        items = list(self.variables.list_vars().items())
+        if idx < 0 or idx >= len(items):
+            return None
+        name, value = items[idx]
+        shown = f"{value:g}".rstrip(".")
+        return StubEntry("var", name, shown, f"{name} = {shown}", name)
+
+    def selected_entry(self) -> StubEntry | None:
         items = list(self.variables.list_vars().items())
         if not items:
             return None
         idx = self.selected if self.selected >= 0 else len(items) - 1
-        return items[idx]
+        return self._entry(idx)
 
     def reset_selection(self) -> None:
         self.selected = -1
 
     def delete_selected(self) -> bool:
-        current = self.selected_var()
+        current = self.selected_entry()
         if current is None:
             return False
-        return self.variables.delete(current[0])
+        return self.variables.delete(current.target)
 
 
 class StubHelpPanel:
@@ -126,6 +149,7 @@ def make_app() -> App:
     app._last_tray_edit = -1
     app.too_small = False
     app.variables_path = None  # sin persistencia por defecto en tests
+    app.functions_path = None
     app.history_path = None
     app.theme = resolve_theme({}, 24, False)
     app.update_available = False
@@ -517,6 +541,84 @@ def test_asignacion_no_va_al_historial() -> None:
     assert app.result_display == "5"
 
 
+def test_definicion_funcion_define_y_persiste(tmp_path) -> None:
+    app = make_app()
+    app.functions_path = tmp_path / "functions.json"
+    for char in "regla3(a, b, c) = b*c/a":
+        app._insert(char)
+    app.expression = "regla3(a, b, c) = b*c/a"
+    app._handle_action("eval", "")
+    assert app.result_display == "fn regla3"
+    assert app.calc.functions.get("regla3") is not None
+    assert len(app.history) == 0
+    data = json.loads((tmp_path / "functions.json").read_text(encoding="utf-8"))
+    assert data == [{"name": "regla3", "params": ["a", "b", "c"], "body": "b*c/a"}]
+
+
+def test_definicion_funcion_duplicada_da_error() -> None:
+    app = make_app()
+    app.expression = "sqrt(x) = x"
+    app._handle_action("eval", "")
+    assert "redefinir" in app.error
+
+
+def test_llamada_a_funcion_definida() -> None:
+    app = make_app()
+    app.expression = "regla3(a, b, c) = b*c/a"
+    app._handle_action("eval", "")
+    app.expression = "regla3(10, 48, 5)"
+    app._handle_action("eval", "")
+    assert app.result_display == "24"
+
+
+def test_vars_activate_funcion_inserta_apertura() -> None:
+    app = make_app()
+
+    class StubFuncPanel(StubVarsPanel):
+        def selected_entry(self) -> StubEntry | None:
+            return StubEntry(
+                "func",
+                "regla3",
+                "regla3(",
+                "regla3(a, b, c) = b*c/a",
+                "regla3",
+            )
+
+    app.vars_panel = StubFuncPanel(app.calc.variables)  # type: ignore[assignment]
+    app._vars_activate()
+    assert app.expression == "regla3("
+
+
+def test_vars_delete_funcion_persiste(tmp_path) -> None:
+    app = make_app()
+    app.functions_path = tmp_path / "functions.json"
+    app.expression = "regla3(a, b, c) = b*c/a"
+    app._handle_action("eval", "")
+    assert json.loads((tmp_path / "functions.json").read_text(encoding="utf-8"))
+
+    class StubFuncPanel(StubVarsPanel):
+        def selected_entry(self) -> StubEntry | None:
+            return StubEntry(
+                "func",
+                "regla3",
+                "regla3(",
+                "regla3(a, b, c) = b*c/a",
+                "regla3",
+            )
+
+        def delete_selected(self) -> bool:
+            ok = bool(app.calc.functions.delete("regla3"))
+            self.selected = -1
+            return ok
+
+    app.vars_panel = StubFuncPanel(app.calc.variables)  # type: ignore[assignment]
+    app.focus = "vars"
+    app._handle_vars_key(ord("x"))
+    assert app.calc.functions.get("regla3") is None
+    data = json.loads((tmp_path / "functions.json").read_text(encoding="utf-8"))
+    assert data == []
+
+
 def test_calculo_si_va_al_historial() -> None:
     app = make_app()
     for char in "2+3":
@@ -639,13 +741,18 @@ def test_edicion_enter_evalua_guarda_y_sale() -> None:
     assert app.calc.variables.get("x") == 9
 
 
-def test_edicion_space_evalua_y_sale() -> None:
+def test_edicion_space_inserta_espacio() -> None:
     app = make_app()
     app._handle_key(ord("e"))
-    _feed(app, "2+3")
-    app._handle_key(32)
+    _feed(app, "regla3(a,")
+    app._handle_key(32)  # espacio dentro de la firma
+    _feed(app, "b, c) = b*c/a")
+    assert app.editing is True
+    assert app.expression == "regla3(a, b, c) = b*c/a"
+    app._handle_key(10)
     assert app.editing is False
-    assert app.result_display == "5"
+    assert app.result_display == "fn regla3"
+    assert app.calc.functions.get("regla3") is not None
 
 
 def test_edicion_esc_sale_sin_evaluar() -> None:

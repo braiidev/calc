@@ -83,3 +83,42 @@ def test_history_load_entries_recorta_al_maximo() -> None:
     history = History(max_size=2)
     history.load_entries([HistoryEntry(str(i), str(i)) for i in range(5)])
     assert [e.expr for e in history.entries()] == ["3", "4"]
+
+
+def test_functions_roundtrip(tmp_path) -> None:
+    path = tmp_path / "functions.json"
+    data = [{"name": "regla3", "params": ["a", "b", "c"], "body": "b*c/a"}]
+    persist.save_functions(data, path)
+    assert persist.load_functions(path) == data
+
+
+def test_functions_load_inexistente_o_corrupto(tmp_path) -> None:
+    assert persist.load_functions(tmp_path / "nope.json") == []
+    bad = tmp_path / "bad.json"
+    bad.write_text("{ no es json", encoding="utf-8")
+    assert persist.load_functions(bad) == []
+
+
+def test_functions_load_filtra_invalidos(tmp_path) -> None:
+    path = tmp_path / "f.json"
+    path.write_text(
+        json.dumps(
+            [
+                {"name": "ok", "params": ["x"], "body": "x*2"},
+                {"name": "mal nombre", "params": ["x"], "body": "x"},
+                {"name": "ok", "params": ["x", 3], "body": "x"},
+                {"params": ["x"], "body": "x"},
+                {"name": "ok", "params": ["x"], "body": 3},
+                "x",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert persist.load_functions(path) == [
+        {"name": "ok", "params": ["x"], "body": "x*2"}
+    ]
+
+
+def test_functions_path_junto_al_config(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("CALC_CONFIG", str(tmp_path / "config.json"))
+    assert persist.functions_path() == tmp_path / "functions.json"

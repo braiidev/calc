@@ -13,9 +13,12 @@ from tui.help_panel import HelpPanel
 from tui.history_panel import HistoryPanel
 from tui.keyboard import Keyboard
 from tui.persist import (
+    functions_path,
     history_path,
+    load_functions,
     load_history,
     load_variables,
+    save_functions,
     save_history,
     save_variables,
     variables_path,
@@ -83,6 +86,8 @@ class App:
         self.calc = Calculator()
         self.variables_path: Path | None = variables_path()
         self.calc.variables.load_user_vars(load_variables(self.variables_path))
+        self.functions_path: Path | None = functions_path()
+        self.calc.functions.load_user_functions(load_functions(self.functions_path))
         self.history = History()
         self.history_path: Path | None = history_path()
         self.history.load_entries(load_history(self.history_path))
@@ -185,6 +190,7 @@ class App:
             self.attrs,
             glyphs,
             bordered,
+            functions=self.calc.functions,
         )
         self.help_panel = HelpPanel(self.help_win, self.attrs)
         self.keyboard = Keyboard(self.keyboard_win, self.attrs, glyphs)
@@ -320,7 +326,7 @@ class App:
             label = f" {self.update_label}" if self.update_label else ""
             update = f" · U actualizar{label}"
         if self.editing:
-            return f"{prompt} edición · tipeá texto · enter/space evaluar · esc salir{update}"
+            return f"{prompt} edición · tipeá texto · enter evaluar · esc salir{update}"
         if self.show_help:
             return f"{prompt} ayuda · ? o esc cerrar · q salir"
         if not self.theme.status_bar:
@@ -346,12 +352,11 @@ class App:
         return f"{entry.expr} = {entry.result}"
 
     def _vars_item(self) -> str:
-        """Variable seleccionada como texto `nombre = valor`."""
-        var = self.vars_panel.selected_var()
-        if var is None:
+        """Entrada seleccionada (variable o función) como texto `nombre = ...`."""
+        entry = self.vars_panel.selected_entry()
+        if entry is None:
             return "—"
-        name, value = var
-        return f"{name} = {format_result(value)}"
+        return entry.display
 
     # ----- entrada -----
 
@@ -451,8 +456,12 @@ class App:
         self._update_message = ""
 
     def _handle_edit_key(self, ch: int) -> None:
-        """Teclas en modo edición: texto libre y movimiento de cursor."""
-        if ch in KEY_ENTER or ch == SPACE:
+        """Teclas en modo edición: texto libre y movimiento de cursor.
+
+        Espacio inserta un espacio (texto libre, p. ej. `f(a, b) = expr`);
+        enter/esc salen (con o sin evaluar).
+        """
+        if ch in KEY_ENTER:
             self.editing = False
             self._handle_action("eval", "")
         elif ch == 27:  # esc: salir sin evaluar
@@ -469,6 +478,8 @@ class App:
             self.cursor = 0
         elif ch in (curses.KEY_END, 5):  # End / Ctrl-E
             self.cursor = len(self.expression)
+        elif ch == SPACE:  # espacio es texto válido (`f(a, b) = expr`)
+            self._insert_at_cursor(" ")
         elif 32 < ch <= 126:
             self._insert_at_cursor(chr(ch))
 
@@ -563,6 +574,7 @@ class App:
         elif ch in (ord("x"),):
             if self.vars_panel.delete_selected():
                 self._persist_variables()
+                self._persist_functions()
         elif ch in (ord("X"),):
             user_vars = len(self.calc.variables.list_vars()) - len(
                 self.calc.variables.BUILTINS
@@ -580,6 +592,12 @@ class App:
         if self.variables_path is None:
             return
         save_variables(self.calc.variables.user_vars(), self.variables_path)
+
+    def _persist_functions(self) -> None:
+        """Guardar las funciones de usuario (best-effort)."""
+        if self.functions_path is None:
+            return
+        save_functions(self.calc.functions.user_functions(), self.functions_path)
 
     def _persist_history(self) -> None:
         """Guardar el historial (best-effort)."""
@@ -701,17 +719,20 @@ class App:
         self._last_tray_edit = self._edit_counter
 
     def _vars_activate(self) -> None:
-        """Traer el valor de la variable seleccionada a la bandeja."""
-        var = self.vars_panel.selected_var()
-        if var is None:
+        """Traer la entrada seleccionada a la bandeja.
+
+        Variable → su valor; función → `f(` para completar los argumentos.
+        """
+        entry = self.vars_panel.selected_entry()
+        if entry is None:
             return
         if (
-            self._last_tray == ("vars", var[0])
+            self._last_tray == ("vars", entry.name)
             and self._edit_counter == self._last_tray_edit
         ):
             return
-        self._tray_activate_value(format_result(var[1]))
-        self._last_tray = ("vars", var[0])
+        self._tray_activate_value(entry.action)
+        self._last_tray = ("vars", entry.name)
         self._last_tray_edit = self._edit_counter
 
     def _tray_activate_value(self, value: str) -> None:
@@ -762,6 +783,18 @@ class App:
             if expr == "":
                 return
             try:
+                defined = self.calc.define(
+                    expr
+                )  # `f(a, b) = expr`: registra la función
+                if defined is not None:
+                    self.result_display = f"fn {defined}"
+                    self.error = ""
+                    self.just_evaluated = True
+                    self.vars_panel.reset_selection()
+                    self.history_panel.reset_selection()
+                    self._persist_functions()
+                    self._edit_counter += 1
+                    return
                 value = self.calc.evaluate(expr)
                 formatted = format_result(value)
                 is_assignment = "=" in expr

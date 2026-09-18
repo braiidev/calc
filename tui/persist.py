@@ -13,6 +13,7 @@ from tui.theme import config_path
 
 FILENAME = "variables.json"
 HISTORY_FILENAME = "history.json"
+FUNCTIONS_FILENAME = "functions.json"
 
 
 def variables_path() -> Path:
@@ -57,6 +58,52 @@ def save_variables(store: dict[str, float], path: Optional[Path] = None) -> None
 def history_path() -> Path:
     """Ruta del archivo de historial, junto al config del usuario."""
     return config_path().with_name(HISTORY_FILENAME)
+
+
+def functions_path() -> Path:
+    """Ruta del archivo de funciones de usuario, junto al config del usuario."""
+    return config_path().with_name(FUNCTIONS_FILENAME)
+
+
+def load_functions(path: Optional[Path] = None) -> list[dict]:
+    """Leer funciones de usuario; [] si no existe, está corrupto o es inválido."""
+    target = path or functions_path()
+    try:
+        raw = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(raw, list):
+        return []
+    result: list[dict] = []
+    for item in raw:
+        name = item.get("name") if isinstance(item, dict) else None
+        params = item.get("params") if isinstance(item, dict) else None
+        body = item.get("body") if isinstance(item, dict) else None
+        if not isinstance(name, str) or not name.isidentifier():
+            continue
+        if not isinstance(params, list) or not all(
+            isinstance(p, str) and p.isidentifier() for p in params
+        ):
+            continue
+        if not isinstance(body, str):
+            continue
+        result.append({"name": name, "params": params, "body": body})
+    return result
+
+
+def save_functions(data: list[dict], path: Optional[Path] = None) -> None:
+    """Escribir las funciones de forma atómica (ignora errores de E/S)."""
+    target = path or functions_path()
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_name(target.name + ".tmp")
+        tmp.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        tmp.replace(target)
+    except OSError:
+        pass
 
 
 def load_history(path: Optional[Path] = None) -> list[HistoryEntry]:

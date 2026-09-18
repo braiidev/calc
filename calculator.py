@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
 
+from models.functions import Functions, FunctionDef
 from models.variables import Variables
 
 
@@ -83,6 +84,15 @@ class UnaryOpNode(Node):
 class AssignNode(Node):
     name: str
     value: Node
+
+
+@dataclass
+class DefNode(Node):
+    """Definición de función de usuario: `f(a, b) = expr`."""
+
+    name: str
+    params: list[str]
+    body: Node
 
 
 @dataclass
@@ -227,7 +237,34 @@ class Parser:
             name = self._advance().lexeme
             self._expect(TokType.ASSIGN)
             return AssignNode(name, self._parse_assign())
+        # función: `f(a, b) = expr` (solo como definición; si no hay '=', es una llamada)
+        if self._current().type == TokType.IDENT and self._peek() == TokType.LPAREN:
+            defined = self._try_parse_def()
+            if defined is not None:
+                return defined
         return self._parse_expr()
+
+    def _try_parse_def(self) -> Optional[Node]:
+        """Intentar `IDENT '(' IDENT (',' IDENT)* ')' '=' expr`; si no cuadra, rewind."""
+        start = self._pos
+        name = self._advance().lexeme
+        self._expect(TokType.LPAREN)
+        params: list[str] = []
+        if self._current().type == TokType.IDENT:
+            params.append(self._advance().lexeme)
+            while self._match(TokType.COMMA):
+                if self._current().type != TokType.IDENT:
+                    self._pos = start
+                    return None
+                params.append(self._advance().lexeme)
+        if not self._match(TokType.RPAREN):
+            self._pos = start
+            return None
+        if not self._match(TokType.ASSIGN):
+            self._pos = start
+            return None
+        body = self._parse_assign()
+        return DefNode(name, params, body)
 
     def _parse_expr(self) -> Node:
         node = self._parse_term()
@@ -273,17 +310,17 @@ class Parser:
             return NumberNode(token.value)
         if token.type == TokType.IDENT:
             self._advance()
-            if token.lexeme in _FUNCTIONS:
-                self._expect(TokType.LPAREN)
+            if self._match(TokType.LPAREN):
                 args = [self._parse_expr()]
                 while self._match(TokType.COMMA):
                     args.append(self._parse_expr())
                 self._expect(TokType.RPAREN)
-                arity = _FUNCTIONS[token.lexeme]
-                if len(args) != arity:
-                    raise CalcSyntaxError(
-                        f"'{token.lexeme}' espera {arity} argumento(s), recibió {len(args)}"
-                    )
+                if token.lexeme in _FUNCTIONS:
+                    arity = _FUNCTIONS[token.lexeme]
+                    if len(args) != arity:
+                        raise CalcSyntaxError(
+                            f"'{token.lexeme}' espera {arity} argumento(s), recibió {len(args)}"
+                        )
                 return CallNode(token.lexeme, args)
             return VarNode(token.lexeme)
         if token.type == TokType.LPAREN:
@@ -317,46 +354,119 @@ _LABELS: dict[TokType, str] = {
 # ---------------- Evaluator ----------------
 
 _FACTORIAL_MAX = 1000
+_MAX_CALL_DEPTH = 100
 
 
-def evaluate_ast(node: Node, variables: Optional[Variables] = None) -> float:
+class _Scope(Variables):
+    """Variables con un frame local encima (params de una función llamada).
+
+    Los parámetros tapan a las variables globales/builtin; las asignaciones
+    dentro del cuerpo afectan al scope global.
+    """
+
+    def __init__(self, bindings: dict[str, float], parent: Variables) -> None:
+        super().__init__()
+        self._bindings = dict(bindings)
+        self._parent = parent
+
+    def get(self, name: str) -> Optional[float]:
+        if name in self._bindings:
+            return self._bindings[name]
+        return self._parent.get(name)
+
+    def set(self, name: str, value: float) -> None:
+        self._parent.set(name, value)
+
+    def delete(self, name: str) -> bool:
+        if name in self._bindings:
+            del self._bindings[name]
+            return True
+        return self._parent.delete(name)
+
+    def list_vars(self) -> dict[str, float]:
+        return {**self._parent.list_vars(), **self._bindings}
+
+    def user_vars(self) -> dict[str, float]:
+        return self._parent.user_vars()
+
+
+def evaluate_ast(
+    node: Node,
+    variables: Optional[Variables] = None,
+    functions: Optional[Functions] = None,
+    depth: int = 0,
+) -> float:
     """Evaluar el árbol sintáctico abstracto.
 
-    `variables` se actualiza con las asignaciones (`x = 5`) encontradas.
+    `variables` se actualiza con las asignaciones (`x = 5`) encontradas;
+    `functions` es el store de funciones de usuario para las llamadas.
     """
     if variables is None:
         variables = Variables()
+    if functions is None:
+        functions = Functions()
     if isinstance(node, NumberNode):
         return node.value
     if isinstance(node, VarNode):
         return _lookup_var(variables, node.name)
     if isinstance(node, AssignNode):
-        value = evaluate_ast(node.value, variables)
+        value = evaluate_ast(node.value, variables, functions, depth)
         _set_var(variables, node.name, value)
         return value
+    if isinstance(node, DefNode):
+        raise CalcSyntaxError(
+            f"Definición de '{node.name}' fuera de lugar: solo como expresión completa"
+        )
     if isinstance(node, UnaryOpNode):
-        value = evaluate_ast(node.child, variables)
+        value = evaluate_ast(node.child, variables, functions, depth)
         if node.op == "-":
             return -value
         if node.op == "!":
             return _factorial(value)
         raise CalcMathError(f"Operador desconocido: '{node.op}'")
     if isinstance(node, CallNode):
-        args = [evaluate_ast(arg, variables) for arg in node.args]
-        return _call_function(node.name, args)
+        args = [evaluate_ast(arg, variables, functions, depth) for arg in node.args]
+        return _call_function(node.name, args, variables, functions, depth)
     if isinstance(node, BinOpNode):
-        left = evaluate_ast(node.left, variables)
-        right = evaluate_ast(node.right, variables)
+        left = evaluate_ast(node.left, variables, functions, depth)
+        right = evaluate_ast(node.right, variables, functions, depth)
         return _apply_binop(node.op, left, right)
     raise CalcSyntaxError("Nodo desconocido en el árbol de expresión")
 
 
-def _call_function(name: str, args: list[float]) -> float:
+def _call_function(
+    name: str,
+    args: list[float],
+    variables: Variables,
+    functions: Optional[Functions] = None,
+    depth: int = 0,
+) -> float:
     if name == "sqrt":
         return _sqrt(args[0])
     if name == "root":
         return _root(args[0], args[1])
+    if functions is not None:
+        defined = functions.get(name)
+        if defined is not None:
+            return _call_user_function(defined, args, variables, functions, depth)
     raise CalcMathError(f"Función desconocida: '{name}'")
+
+
+def _call_user_function(
+    fn: FunctionDef,
+    args: list[float],
+    variables: Variables,
+    functions: Functions,
+    depth: int,
+) -> float:
+    if len(args) != len(fn.params):
+        raise CalcMathError(
+            f"'{fn.name}' espera {len(fn.params)} argumento(s), recibió {len(args)}"
+        )
+    if depth >= _MAX_CALL_DEPTH:
+        raise CalcMathError("Recursión demasiado profunda")
+    scope = _Scope(dict(zip(fn.params, args)), variables)
+    return evaluate_ast(fn.body, scope, functions, depth + 1)
 
 
 def _lookup_var(variables: Variables, name: str) -> float:
@@ -502,12 +612,33 @@ class Calculator:
 
     def __init__(self) -> None:
         self.variables = Variables()
+        self.functions = Functions()
 
     def evaluate(self, expr: str) -> float:
         tokens = tokenize(expr)
         parser = Parser(tokens)
         ast = parser.parse()
-        return evaluate_ast(ast, self.variables)
+        return evaluate_ast(ast, self.variables, self.functions)
+
+    def is_definition(self, expr: str) -> bool:
+        """True si la expresión es una definición de función `f(a, b) = ...`."""
+        try:
+            ast = Parser(tokenize(expr)).parse()
+        except CalcSyntaxError:
+            return False
+        return isinstance(ast, DefNode)
+
+    def define(self, expr: str) -> Optional[str]:
+        """Registrar una función de usuario y devolver su nombre; None si no es definición."""
+        ast = Parser(tokenize(expr)).parse()
+        if not isinstance(ast, DefNode):
+            return None
+        source = expr.split("=", 1)[1].strip()
+        try:
+            self.functions.define(ast.name, ast.params, ast.body, source)
+        except ValueError as exc:
+            raise CalcSyntaxError(str(exc))
+        return ast.name
 
     def notation(self, expr: str) -> str:
         """Etiquetas semánticas de las operaciones complejas, en orden de aparición.
