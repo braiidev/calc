@@ -617,7 +617,8 @@ def test_normal_si_inserta_digitos_y_operadores() -> None:
     app.focus = "history"
     app._handle_key(ord("7"))
     app._handle_key(ord("+"))
-    assert app.expression == "7+"
+    app._handle_key(ord("."))
+    assert app.expression == "7+."
 
 
 def test_edicion_cursor_arranca_al_final() -> None:

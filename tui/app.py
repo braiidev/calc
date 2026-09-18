@@ -37,7 +37,7 @@ KEY_ENTER = (10, 13, curses.KEY_ENTER)
 TAB = 9
 SPACE = 32
 # Caracteres insertables no alfanuméricos (letras = identificadores de variables)
-OPERATOR_LITERALS = "+-*/()%!,="
+OPERATOR_LITERALS = "+-*/()%!.,="
 
 # Capa homerow: espejo del numpad en la mano derecha del teclado QWERTY.
 # uio → 4/5/6, jkl → 1/2/3, m → 0.  (7-9 y el resto ya se insertan directo.)
