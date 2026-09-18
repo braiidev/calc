@@ -70,7 +70,7 @@ def _fake_install(tmp_path: Path) -> Path:
 def test_version(tmp_path: Path) -> None:
     r = _run(["--version"], calc_dir=tmp_path / "app", calc_bin=tmp_path / "calc")
     assert r.returncode == 0
-    assert "v0.9" in r.stdout
+    assert "v1.0" in r.stdout
 
 
 def test_help(tmp_path: Path) -> None:
@@ -101,7 +101,7 @@ def test_funciona_con_sh_posix(tmp_path: Path) -> None:
         timeout=60,
     )
     assert r.returncode == 0, r.stderr
-    assert "v0.9" in r.stdout
+    assert "v1.0" in r.stdout
 
 
 def test_piped_via_sh(tmp_path: Path) -> None:
@@ -115,7 +115,7 @@ def test_piped_via_sh(tmp_path: Path) -> None:
             timeout=60,
         )
     assert r.returncode == 0, r.stderr
-    assert "v0.9" in r.stdout
+    assert "v1.0" in r.stdout
 
 
 def test_uninstall_rechaza_app_dir_inseguro(tmp_path: Path) -> None:
