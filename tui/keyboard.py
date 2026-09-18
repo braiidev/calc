@@ -18,6 +18,7 @@ class KeyDef:
     char: Optional[str] = None
     desc: Optional[str] = None
     glyph: Optional[str] = None
+    hint: Optional[str] = None  # letra de capa homerow que inserta este número
 
 
 _KEYS: list[list[Optional[KeyDef]]] = [
@@ -30,7 +31,8 @@ _KEYS: list[list[Optional[KeyDef]]] = [
         KeyDef("%", desc="módulo"),
         KeyDef("!", char="!", desc="factorial"),
     ],
-    # Bloque memoria + números + operadores
+    # Bloque memoria + números + operadores (7-9 son la fila física; 0-6
+    # tienen su espejo homerow para no mover la mano del teclado QWERTY).
     [
         KeyDef("ANS", "ans", desc="traer último resultado"),
         KeyDef("7", desc="número"),
@@ -41,23 +43,23 @@ _KEYS: list[list[Optional[KeyDef]]] = [
     ],
     [
         KeyDef("(", desc="paréntesis"),
-        KeyDef("4", desc="número"),
-        KeyDef("5", desc="número"),
-        KeyDef("6", desc="número"),
+        KeyDef("4", desc="número", hint="u"),
+        KeyDef("5", desc="número", hint="i"),
+        KeyDef("6", desc="número", hint="o"),
         KeyDef("+", desc="sumar"),
         KeyDef("-", char="-", desc="restar", glyph="minus"),
     ],
     [
         KeyDef(")", desc="paréntesis"),
-        KeyDef("1", desc="número"),
-        KeyDef("2", desc="número"),
-        KeyDef("3", desc="número"),
+        KeyDef("1", desc="número", hint="j"),
+        KeyDef("2", desc="número", hint="k"),
+        KeyDef("3", desc="número", hint="l"),
         KeyDef("*", char="*", desc="multiplicar", glyph="times"),
         KeyDef("/", char="/", desc="dividir", glyph="divide"),
     ],
     [
         None,
-        KeyDef("0", desc="número"),
+        KeyDef("0", desc="número", hint="m"),
         KeyDef(".", desc="decimal"),
         KeyDef("=", "eval", desc="evaluar"),
         None,
@@ -82,6 +84,7 @@ class Keyboard:
         self.glyphs = glyphs or {}
         self.row = 0
         self.col = 0
+        self.show_hints = False
 
     def render(self, highlight: Optional[str] = None) -> None:
         height, width = self.win.getmaxyx()
@@ -124,10 +127,19 @@ class Keyboard:
         self.win.noutrefresh()
 
     def _label(self, key: KeyDef) -> str:
-        """Etiqueta visible: glifo Unicode si está disponible, si no el fallback."""
+        """Etiqueta visible: glifo Unicode si está disponible, si no el fallback.
+
+        Con hints activos los números muestran su espejo homerow (`4u`).
+        """
         if key.glyph and self.glyphs.get(key.glyph):
             return self.glyphs[key.glyph]
+        if self.show_hints and key.hint is not None:
+            return f"{key.label}{key.hint}"
         return key.label
+
+    def toggle_hints(self) -> None:
+        """Activar/desactivar los hints de capa homerow en los botones."""
+        self.show_hints = not self.show_hints
 
     def _attrs_for(
         self, key: KeyDef, focused: bool, highlight: Optional[str] = None

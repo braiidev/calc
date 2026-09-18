@@ -39,6 +39,10 @@ SPACE = 32
 # Caracteres insertables no alfanuméricos (letras = identificadores de variables)
 OPERATOR_LITERALS = "+-*/()%!,="
 
+# Capa homerow: espejo del numpad en la mano derecha del teclado QWERTY.
+# uio → 4/5/6, jkl → 1/2/3, m → 0.  (7-9 y el resto ya se insertan directo.)
+HOME_DIGITS = {"u": "4", "i": "5", "o": "6", "j": "1", "k": "2", "l": "3", "m": "0"}
+
 DISPLAY_H = 5
 KEYBOARD_H = 6
 MIN_ROWS = DISPLAY_H + KEYBOARD_H + 2  # mínimo: display + historial + teclado
@@ -89,6 +93,7 @@ class App:
         self.show_help = False
         self.editing = False  # modo edición: tipeo libre (ver `e`)
         self.cursor = 0  # posición del cursor dentro de `expression`
+        self.key_hints = False  # hints de capa homerow en el teclado (h toggle)
         self.pending_confirm: str | None = None
         self._pending_confirm_action: str = "clear_history"
         self._edit_counter = 0
@@ -291,6 +296,7 @@ class App:
         """Barra: `<modo> · <acción bajo cursor> · tab <destino> · e editar · ? ayuda · q salir`."""
         prompt = self.theme.glyphs.get("prompt", ">")
         update = ""
+        hints = " · h hints on" if self.key_hints else ""
         if self.update_available:
             label = f" {self.update_label}" if self.update_label else ""
             update = f" · U actualizar{label}"
@@ -300,7 +306,7 @@ class App:
             return f"{prompt} ayuda · ? o esc cerrar · q salir"
         if not self.theme.status_bar:
             base = {"keyboard": K_HINT, "history": H_HINT, "vars": V_HINT}[self.focus]
-            return base + update
+            return base + update + hints
         if self.focus == "keyboard":
             desc = self.keyboard.focused_description()
             item = f"«{desc}»" if desc else "—"
@@ -310,7 +316,7 @@ class App:
             item = self._vars_item()
         mode = self._MODE_LABEL[self.focus]
         nxt = self._NEXT_FOCUS[self.focus]
-        return f"{prompt} {mode} · {item} · tab {nxt} · e editar · ? ayuda · q salir{update}"
+        return f"{prompt} {mode} · {item} · tab {nxt} · e editar · ? ayuda · q salir{update}{hints}"
 
     def _history_item(self) -> str:
         """Entrada seleccionada del historial como texto `expr = result`."""
@@ -347,10 +353,8 @@ class App:
                 self.show_help = False
             elif ch in (ord("q"), ord("Q")):
                 return True
-            elif ch in (ord("j"), curses.KEY_DOWN):
-                self.help_panel.scroll(1)
-            elif ch in (ord("k"), curses.KEY_UP):
-                self.help_panel.scroll(-1)
+            elif ch in (ord("w"), ord("s"), curses.KEY_DOWN, curses.KEY_UP):
+                self.help_panel.scroll(1 if ch in (ord("s"), curses.KEY_DOWN) else -1)
             return False
 
         if ch == TAB:
@@ -373,6 +377,10 @@ class App:
             return False
         if ch == 27:  # ESC: limpiar display
             self._handle_action("clear", "")
+            return False
+        if ch in (ord("h"), ord("H")):  # toggle hints de capa homerow
+            self.key_hints = not self.key_hints
+            self.keyboard.toggle_hints()
             return False
 
         # Enter y Space según el foco
@@ -405,12 +413,14 @@ class App:
             if self._handle_keyboard_key(ch):
                 return False
 
-        # Insertable directo: solo dígitos y operadores. Las letras son comandos
-        # (navegación/atajos); para texto libre usá el modo edición (`e`).
+        # Insertable directo: dígitos, operadores y capa homerow. Las letras
+        # command que sobreviven se ignoran; para texto libre usá modo edición.
         if 32 < ch <= 126:
             c = chr(ch)
             if c.isdigit() or c in OPERATOR_LITERALS:
                 self._insert(c)
+            elif c in HOME_DIGITS:
+                self._insert(HOME_DIGITS[c])
         return False
 
     def _enter_edit(self) -> None:
@@ -483,17 +493,17 @@ class App:
 
     def _handle_keyboard_key(self, ch: int) -> bool:
         """Teclas del foco teclado. Retorna True si se consumieron."""
-        if ch in (ord("h"), curses.KEY_LEFT):
-            self.keyboard.move(0, -1)
-        elif ch in (ord("l"), curses.KEY_RIGHT):
-            self.keyboard.move(0, 1)
-        elif ch in (ord("j"), curses.KEY_DOWN):
-            self.keyboard.move(1, 0)
-        elif ch in (ord("k"), curses.KEY_UP):
+        if ch in (ord("w"), curses.KEY_UP):
             self.keyboard.move(-1, 0)
+        elif ch in (ord("s"), curses.KEY_DOWN):
+            self.keyboard.move(1, 0)
+        elif ch in (ord("a"), curses.KEY_LEFT):
+            self.keyboard.move(0, -1)
+        elif ch in (ord("d"), curses.KEY_RIGHT):
+            self.keyboard.move(0, 1)
         elif ch in (ord("c"), ord("C")):
             self._handle_action("back", "")
-        elif ch in (ord("d"), ord("D")):
+        elif ch in (ord("x"),):
             self._handle_action("clear", "")
         elif ch in KEY_BACKSPACE:
             self._handle_action("back", "")
@@ -503,18 +513,18 @@ class App:
 
     def _handle_history_key(self, ch: int) -> bool:
         """Teclas del foco historial. Retorna True si se consumieron."""
-        if ch in (ord("j"), curses.KEY_DOWN):
+        if ch in (ord("s"), curses.KEY_DOWN):
             self.history_panel.move(1)
-        elif ch in (ord("k"), curses.KEY_UP):
+        elif ch in (ord("w"), curses.KEY_UP):
             self.history_panel.move(-1)
-        elif ch == ord("h"):
+        elif ch == ord("g"):
             self.history_panel.to_first()
-        elif ch == ord("l"):
+        elif ch == ord("G"):
             self.history_panel.to_last()
-        elif ch in (ord("d"), ord("D")):
+        elif ch in (ord("x"),):
             if self.history_panel.delete_selected():
                 self._persist_history()
-        elif ch in (ord("x"), ord("X")):
+        elif ch in (ord("X"),):
             if len(self.history):
                 self._ask_confirm("¿Borrar todo el historial? (y/N)", "clear_history")
         else:
@@ -523,18 +533,18 @@ class App:
 
     def _handle_vars_key(self, ch: int) -> bool:
         """Teclas del foco variables. Retorna True si se consumieron."""
-        if ch in (ord("j"), curses.KEY_DOWN):
+        if ch in (ord("s"), curses.KEY_DOWN):
             self.vars_panel.move(1)
-        elif ch in (ord("k"), curses.KEY_UP):
+        elif ch in (ord("w"), curses.KEY_UP):
             self.vars_panel.move(-1)
-        elif ch == ord("h"):
+        elif ch == ord("g"):
             self.vars_panel.to_first()
-        elif ch == ord("l"):
+        elif ch == ord("G"):
             self.vars_panel.to_last()
-        elif ch in (ord("d"), ord("D")):
+        elif ch in (ord("x"),):
             if self.vars_panel.delete_selected():
                 self._persist_variables()
-        elif ch in (ord("x"), ord("X")):
+        elif ch in (ord("X"),):
             user_vars = len(self.calc.variables.list_vars()) - len(
                 self.calc.variables.BUILTINS
             )

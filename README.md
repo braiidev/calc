@@ -41,23 +41,26 @@ calc --version
 
 ### Teclas
 
-Modo normal (las letras son comandos; `0-9 . + - * / ( ) % ! = ,` se insertan
-directo):
+Modo normal (los dígitos `0-9`, `.`, operadores y la capa homerow se insertan
+directo; las demás letras son comandos):
 
 | Tecla | Acción |
 |-------|--------|
+| `w a s d` / flechas | mover la selección (teclado, historial, variables, ayuda) |
+| `u i o` → `4 5 6` · `j k l` → `1 2 3` · `m` → `0` | capa numérica homerow (sin numpad; además de la fila `0-9` física) |
+| `h` | toggle hints de capa homerow en el teclado |
 | `tab` | cicla el foco: teclado → historial → variables |
 | `enter` / `space` | evaluar (teclado) o traer el valor bajo el cursor (historial/variables) |
 | `e` | entrar al modo edición (texto libre) |
-| `esc` / `D` | limpiar el display |
+| `esc` | limpiar el display |
+| `x` | borrar bajo el cursor: display (teclado) o ítem (historial/variables) |
+| `X` | borrar todo (historial/variables, pide confirmación) |
+| `g` / `G` | ir al inicio / al final (historial/variables) |
+| `c` | borrar hacia atrás (solo foco teclado) |
 | `T` | ciclar el color del tema |
 | `U` | aplicar actualización si hay, o verificarla |
-| `?` | ayuda (`j`/`k` para desplazar, `?`/`esc` cierra) |
+| `?` | ayuda (`w`/`s` o flechas para desplazar, `?`/`esc` cierra) |
 | `q` | salir |
-| `h j k l` | mover la selección (flechas también) |
-| `c` | borrar hacia atrás (solo foco teclado) |
-| `d` | borrar el ítem seleccionado (historial/variables) o limpiar (teclado) |
-| `x` | borrar todo (historial/variables, pide confirmación) |
 
 Modo edición (`e`): todo carácter imprimible se inserta (sin espacios).
 
@@ -71,7 +74,7 @@ Modo edición (`e`): todo carácter imprimible se inserta (sin espacios).
 | `del` | borrar después del cursor |
 
 Para escribir identificadores (p. ej. `hola=5`, `raiz=sqrt(2)`) usá el modo
-edición: en modo normal `h`, `j`, `k`, `l`, `c`, `d`, `x` son atajos.
+edición: en modo normal `w a s d` y `u i o j k l m` son atajos.
 
 ## Operadores y funciones
 

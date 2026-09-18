@@ -91,6 +91,27 @@ def test_render_fallback_ascii() -> None:
     assert "*" in text
 
 
+def test_render_hints_muestra_espejo_homerow() -> None:
+    win = StubWin(6, 80)
+    kb = Keyboard(win, {})  # type: ignore[arg-type]
+    kb.toggle_hints()
+    kb.render()
+    text = " ".join(win.lines)
+    assert "4u" in text
+    assert "0m" in text
+    assert "1j" in text
+    assert "7u" not in text  # 7-9 son la fila física, sin espejo
+
+
+def test_toggle_hints_apaga_el_espejo() -> None:
+    kb = make_kb()
+    assert kb.show_hints is False
+    kb.toggle_hints()
+    assert kb.show_hints is True
+    kb.toggle_hints()
+    assert kb.show_hints is False
+
+
 def test_get_all_keys() -> None:
     assert len(Keyboard.get_all_keys()) == 23
 

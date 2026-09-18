@@ -3,7 +3,7 @@
 import curses
 
 _HELP_LINES = [
-    "AYUDA  ·  ? o esc cerrar  ·  j/k desplazar",
+    "AYUDA  ·  ? o esc cerrar  ·  w/s o flechas desplazar",
     "",
     "OPERADORES",
     "  + - * /   básicos            **         potencia",
@@ -15,11 +15,12 @@ _HELP_LINES = [
     "VARIABLES  pi, e (constantes) · x = 5 (asignar)",
     "",
     "TECLAS",
-    "  e editar (texto libre) · enter/space evaluar · esc salir de edición",
-    "  edición: ←/→ mover · home/end inicio/fin · del borrar",
-    "  tab foco · enter/space evaluar o traer valor",
-    "  esc/D limpiar · c borrar · d borrar ítem · q salir",
-    "  T color · U actualizar · ? ayuda",
+    "  mover: w a s d o flechas (teclado, historial, variables y ayuda)",
+    "  números: física 0-9 · homerow u i o = 4 5 6 · j k l = 1 2 3 · m = 0",
+    "  h hints del teclado · e editar (texto libre) · c retroceder",
+    "  x borrar bajo cursor (display/ítem) · X borrar todo (confirma)",
+    "  tab foco · enter/space evaluar o traer · g/G inicio/fin · esc limpiar",
+    "  T color · U actualizar · ? ayuda · q salir",
 ]
 
 

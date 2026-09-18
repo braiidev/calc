@@ -5,7 +5,8 @@ import json
 
 from calculator import Calculator
 from models.history import History
-from tui.app import TICK_MS, App
+from tui.app import HOME_DIGITS, TICK_MS, App
+from tui.keyboard import Keyboard
 from tui.theme import resolve_theme
 
 
@@ -25,6 +26,32 @@ class StubHistoryPanel:
 
     def reset_selection(self) -> None:
         self.selected = -1
+
+    def move(self, delta: int) -> None:
+        if len(self.history) == 0:
+            return
+        current = self.selected if self.selected >= 0 else len(self.history) - 1
+        self.selected = max(0, min(len(self.history) - 1, current + delta))
+
+    def to_first(self) -> None:
+        if len(self.history):
+            self.selected = 0
+
+    def to_last(self) -> None:
+        if len(self.history):
+            self.selected = len(self.history) - 1
+
+    def delete_selected(self) -> bool:
+        current = self.selected_entry()
+        if current is None:
+            return False
+        idx = current[1]
+        ok = self.history.delete_at(idx)
+        if ok and len(self.history):
+            self.selected = min(max(idx - 1, 0), len(self.history) - 1)
+        else:
+            self.selected = -1
+        return ok
 
 
 class StubVarsPanel:
@@ -91,6 +118,7 @@ def make_app() -> App:
     app.show_help = False
     app.editing = False
     app.cursor = 0
+    app.key_hints = False
     app.pending_confirm = None
     app._pending_confirm_action = "clear_history"
     app._edit_counter = 0
@@ -325,12 +353,12 @@ def test_help_q_sale() -> None:
     assert app._handle_key(ord("q")) is True
 
 
-def test_help_jk_desplaza() -> None:
+def test_help_ws_desplaza() -> None:
     app = make_app()
     app._handle_key(ord("?"))
-    app._handle_key(ord("j"))
+    app._handle_key(ord("s"))
     assert app.help_panel.offset == 1
-    app._handle_key(ord("k"))
+    app._handle_key(ord("w"))
     assert app.help_panel.offset == 0
     app.help_panel.offset = 5
     app._handle_key(ord("?"))  # reabrir vuelve arriba
@@ -641,3 +669,111 @@ def test_edicion_delete_borra_adelante() -> None:
     app._handle_key(curses.KEY_DC)
     assert app.expression == "bc"
     assert app.cursor == 0
+
+
+def test_capa_homerow_inserta_digitos() -> None:
+    for key, valor in HOME_DIGITS.items():
+        app = make_app()
+        app.focus = "history"
+        app._handle_key(ord(key))
+        assert app.expression == valor, key
+
+
+def test_teclado_wasd_navega() -> None:
+    app = make_app()
+    kb = Keyboard(None)  # type: ignore[arg-type]
+    app.keyboard = kb  # type: ignore[assignment]
+    app._handle_key(ord("s"))
+    assert kb.row == 1
+    app._handle_key(ord("w"))
+    assert kb.row == 0
+    app._handle_key(ord("d"))
+    assert kb.col == 1
+    app._handle_key(ord("a"))
+    assert kb.col == 0
+
+
+def test_teclado_d_mueve_y_no_borra() -> None:
+    app = make_app()
+    kb = Keyboard(None)  # type: ignore[arg-type]
+    app.keyboard = kb  # type: ignore[assignment]
+    app.expression = "9"
+    app._handle_key(ord("d"))
+    assert app.expression == "9"
+    assert kb.col == 1
+
+
+def test_teclado_x_limpia_display() -> None:
+    app = make_app()
+    app.keyboard = Keyboard(None)  # type: ignore[arg-type]
+    app.focus = "keyboard"
+    for char in "12+3":
+        app._handle_key(ord(char))
+    app._handle_key(ord("x"))
+    assert app.expression == ""
+
+
+def test_historial_ws_mueve() -> None:
+    app = make_app()
+    for i in range(3):
+        app.history.add(f"{i}+0", str(i))
+    app.focus = "history"
+    app.history_panel.selected = 1
+    app._handle_key(ord("w"))
+    assert app.history_panel.selected == 0
+    app._handle_key(ord("s"))
+    assert app.history_panel.selected == 1
+
+
+def test_historial_gG_extremos() -> None:
+    app = make_app()
+    for i in range(3):
+        app.history.add(f"{i}+0", str(i))
+    app.focus = "history"
+    app._handle_key(ord("g"))
+    assert app.history_panel.selected == 0
+    app._handle_key(ord("G"))
+    assert app.history_panel.selected == 2
+
+
+def test_historial_x_borra_seleccionada() -> None:
+    app = make_app()
+    app.history.add("2+2", "4")
+    app.history.add("3+3", "6")
+    app.focus = "history"
+    app._handle_key(ord("x"))
+    assert len(app.history) == 1
+    entry = app.history[0]
+    assert entry is not None
+    assert entry.expr == "2+2"
+
+
+def test_historial_X_pide_confirmacion() -> None:
+    app = make_app()
+    app.history.add("2+2", "4")
+    app.focus = "history"
+    app._handle_key(ord("X"))
+    assert app.pending_confirm is not None
+    app._process_confirm(ord("y"))
+    assert len(app.history) == 0
+
+
+def test_variables_x_borra_seleccionada() -> None:
+    app = make_app()
+    app.calc.evaluate("x = 5")
+    app.calc.evaluate("y = 3")
+    app.focus = "vars"
+    app._handle_key(ord("x"))
+    assert "y" not in app.calc.variables.user_vars()
+
+
+def test_h_toggle_hints() -> None:
+    app = make_app()
+    app.keyboard = Keyboard(None)  # type: ignore[arg-type]
+    app._handle_key(ord("h"))
+    assert app.key_hints is True
+    assert app.keyboard.show_hints is True
+    assert "h hints on" in app._status_text()
+    app._handle_key(ord("h"))
+    assert app.key_hints is False
+    assert "h hints on" not in app._status_text()
