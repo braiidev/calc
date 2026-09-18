@@ -258,7 +258,13 @@ class App:
             notation = self.calc.notation(self.expression)
         message = self.pending_confirm or self.error or self._update_message
         hint = self._status_text()
-        self.display.render(self.expression, self.result_display, message, notation)
+        self.display.render(
+            self.expression,
+            self.result_display,
+            message,
+            notation,
+            cursor=self.cursor if self.editing else None,
+        )
         self._render_status(hint)
         if self.show_help:
             self.help_panel.render()
