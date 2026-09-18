@@ -5,6 +5,7 @@
 ## Next
 
 ## Done
+- [x] v1.0.3 feat: cursor visible en modo edición (reverse en el carácter/espacio bajo el cursor)
 - [x] v1.0.2 feat: creador de funciones de usuario (`f(a,b) = expr`, panel Vars/Func, persistencia, espacio en edición)
 - [x] v1.0.0 bump: milestone — versión v1.0.0 (main.py, install.sh)
 - [x] v0.9.13 style: layout de 4 secciones apiladas (historial/variables, display + notación, teclado, statusbar) — sin overlap, resize-safe, min límites
