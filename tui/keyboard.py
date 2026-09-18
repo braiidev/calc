@@ -30,7 +30,6 @@ _KEYS: list[list[Optional[KeyDef]]] = [
         KeyDef("%", desc="módulo"),
         KeyDef("!", char="!", desc="factorial"),
     ],
-    [None, None, None, None, None, None],
     # Bloque memoria + números + operadores
     [
         KeyDef("ANS", "ans", desc="traer último resultado"),
@@ -91,12 +90,24 @@ class Keyboard:
             self.win.noutrefresh()
             return
 
+        # Barra divisoria: separa la sección del teclado del resto de la app.
+        if height >= 1:
+            try:
+                self.win.addstr(
+                    0,
+                    0,
+                    self.glyphs.get("h", "-") * width,
+                    self.attrs.get("separator", 0),
+                )
+            except curses.error:
+                pass
+
         grid_w = _GRID_COLS * _BUTTON_W
         # Todos los bloques comparten el mismo offset para quedar alineados.
         x_offset = max((width - grid_w) // 2, 0)
 
         for r, row in enumerate(_KEYS):
-            if r >= height:
+            if 1 + r >= height:
                 break
             for c, key in enumerate(row):
                 if key is None:
@@ -107,7 +118,7 @@ class Keyboard:
                 attrs = self._attrs_for(key, r == self.row and c == self.col, highlight)
                 cell = f"[{self._label(key):^{_BUTTON_W - 2}}]"[:_BUTTON_W]
                 try:
-                    self.win.addstr(r, x, cell, attrs)
+                    self.win.addstr(1 + r, x, cell, attrs)
                 except curses.error:
                     pass
         self.win.noutrefresh()

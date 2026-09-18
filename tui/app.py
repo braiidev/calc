@@ -39,7 +39,7 @@ SPACE = 32
 # Caracteres insertables no alfanuméricos (letras = identificadores de variables)
 OPERATOR_LITERALS = "+-*/()%!,="
 
-DISPLAY_H = 4
+DISPLAY_H = 5
 KEYBOARD_H = 6
 MIN_ROWS = DISPLAY_H + KEYBOARD_H + 2  # mínimo: display + historial + teclado
 MIN_COLS = 30  # ancho mínimo del grid del teclado (6 * 5)

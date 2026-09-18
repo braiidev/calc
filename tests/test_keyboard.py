@@ -37,28 +37,28 @@ def test_descripcion_segun_posicion() -> None:
     kb = make_kb()
     kb.col = 2
     assert kb.focused_description() == "potencia"
-    kb.row = 5
+    kb.row = 4
     kb.col = 3
     assert kb.focused_description() == "evaluar"
 
 
 def test_descripcion_acota_columna() -> None:
     kb = make_kb()
-    kb.row = 5
+    kb.row = 4
     kb.col = 99
     assert kb.focused_description() == "número"  # cae a la primera válida
 
 
-def test_navegacion_salta_fila_en_blanco() -> None:
+def test_navegacion_no_hay_fila_en_blanco() -> None:
     kb = make_kb()
-    kb.move(1, 0)  # fila 1 está vacía -> baja a la 2
-    assert kb.row == 2
+    kb.move(1, 0)  # fila anterior de spacer eliminada: baja a ANS directo
+    assert kb.row == 1
     assert kb.focused_description() == "traer último resultado"
 
 
 def test_navegacion_ignora_huecos() -> None:
     kb = make_kb()
-    kb.row = 5
+    kb.row = 4
     kb.col = 1
     kb.move(0, -1)  # col 0 es hueco: no se mueve
     assert kb.col == 1
@@ -68,7 +68,7 @@ def test_navegacion_ignora_huecos() -> None:
 
 def test_accion_de_boton_con_glifo() -> None:
     kb = make_kb()
-    kb.row = 4
+    kb.row = 3
     kb.col = 4  # × -> inserta "*"
     assert kb.focused_action() == ("insert", "*")
     kb.col = 5  # ÷ -> inserta "/"

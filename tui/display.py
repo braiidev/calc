@@ -46,18 +46,25 @@ class Display:
             attr=self._attr("hint"),
         )
 
-        # Expresión (fila 1, alineada a la derecha, con cursor opcional)
-        self._draw_expression(expression, width, cursor)
-
-        # Separador (fila 2)
-        if height >= 3:
+        # Divisor: separa la barra de estado del display (fila 1)
+        if height >= 2:
             try:
-                self.win.addstr(2, 0, self._glyph("h") * width, self._attr("separator"))
+                self.win.addstr(1, 0, self._glyph("h") * width, self._attr("separator"))
             except curses.error:
                 pass
 
-        # Notación (dim, a la izquierda) y resultado/error (derecha), fila 3
+        # Expresión (fila 2, alineada a la derecha, con cursor opcional)
+        self._draw_expression(expression, width, cursor, row=2)
+
+        # Separador (fila 3)
         if height >= 4:
+            try:
+                self.win.addstr(3, 0, self._glyph("h") * width, self._attr("separator"))
+            except curses.error:
+                pass
+
+        # Notación (dim, a la izquierda) y resultado/error (derecha), fila 4
+        if height >= 5:
             if notation:
                 self._draw_left_aligned(
                     self.win, 3, notation, width, attr=self._attr("hint")
@@ -78,7 +85,11 @@ class Display:
         self.win.noutrefresh()
 
     def _draw_expression(
-        self, expression: str, width: int, cursor: Optional[int]
+        self,
+        expression: str,
+        width: int,
+        cursor: Optional[int],
+        row: int = 1,
     ) -> None:
         """Dibujar la expresión con prompt; si `cursor` no es None, marcarlo."""
         pad = 1
@@ -96,7 +107,7 @@ class Display:
         x = max(width - pad - len(shown), pad)
         attr = self._attr("expression")
         try:
-            self.win.addstr(1, x, shown, attr)
+            self.win.addstr(row, x, shown, attr)
         except curses.error:
             pass
         if cursor is None:
@@ -107,7 +118,7 @@ class Display:
             return
         char = expr[cursor] if 0 <= cursor < len(expr) else " "
         try:
-            self.win.addstr(1, x + shown_idx, char, attr | curses.A_REVERSE)
+            self.win.addstr(row, x + shown_idx, char, attr | curses.A_REVERSE)
         except curses.error:
             pass
 
