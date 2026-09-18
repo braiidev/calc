@@ -1,11 +1,12 @@
 # TODO
 
 ## Doing
-- [ ] v0.9.11 feat: remapeo — WASD/nav, capa homerow (uio/jkl/m), x/X universal, g/G extremos, h toggle hints
+<!-- vacío -->
 
 ## Next
 
 ## Done
+- [x] v0.9.11 feat: remapeo funcional — WASD/nav, capa homerow (uio/jkl/m), x/X universal, g/G extremos, h toggle hints (+ ayuda/README)
 - [x] v0.9.10 style: separación visual de secciones (display con divisor, teclado con barra y grid compacto)
 - [x] v0.9.9 - fix: install.sh compatible con `sh` (dash) para `curl | sh` (sin `set -o pipefail` en sh)
 - [x] v0.9.8 - Historial persistente entre sesiones (`history.json`, carga/guarda con escritura atómica)
